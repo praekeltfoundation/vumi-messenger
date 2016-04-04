@@ -78,7 +78,7 @@ WSGI_APPLICATION = 'vxmessenger.webapp.wsgi.application'
 
 DATABASES = {
     'default': dj_database_url.config(
-        default='sqlite://%s' % os.path.join(BASE_DIR, 'db.sqlite3')),
+        default='sqlite:///%s' % os.path.join(BASE_DIR, 'db.sqlite3')),
 }
 
 RAVEN_CONFIG = {
