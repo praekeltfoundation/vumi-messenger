@@ -5,7 +5,6 @@ from klein import Klein
 from twisted.python import log
 from twisted.internet import reactor
 from twisted.internet.endpoints import serverFromString
-from twisted.internet.task import react
 from twisted.web.server import Site
 
 import click
@@ -32,12 +31,12 @@ class ApiService(object):
               help='Where to log output to.',
               type=click.File('a'),
               default=sys.stdout)
-
 def cli(endpoint, logfile):
     log.startLogging(logfile)
     endpoint = serverFromString(reactor, str(endpoint))
-    d = endpoint.listen(Site(ApiService().app.resource()))
+    endpoint.listen(Site(ApiService().app.resource()))
     reactor.run()
+
 
 if __name__ == '__main__':
     cli()
