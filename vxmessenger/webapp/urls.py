@@ -16,11 +16,12 @@ Including another URLconf
 from django.conf.urls import url
 from django.contrib import admin
 
-from .views import privacy, home
+from .views import privacy, home, challenge
 
 
 urlpatterns = [
     url(r'^admin/', admin.site.urls),
-    url(r'^privacy/', privacy),
-    url(r'^$', home),
+    url(r'^privacy/', privacy, name='privacy'),
+    url(r'^challenge/', challenge, name='challenge'),
+    url(r'^$', home, name='home'),
 ]
