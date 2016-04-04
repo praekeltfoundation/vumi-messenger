@@ -22,12 +22,12 @@ script:
 after_success:
   - coveralls
 
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: Praekelt
-  password:
-    secure: "generate with travis encrypt"
-  on:
-    tags: true
-    all_branches: true
+# deploy:
+#   provider: pypi
+#   distributions: sdist bdist_wheel
+#   user: Praekelt
+#   password:
+#     secure: "generate with travis encrypt"
+#   on:
+#     tags: true
+#     all_branches: true
