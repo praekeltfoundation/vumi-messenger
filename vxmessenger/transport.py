@@ -121,7 +121,8 @@ class MessengerTransport(HttpRpcTransport):
             }),
             headers={
                 'Content-Type': 'application/json',
-            })
+            },
+            pool=self.pool)
 
         if resp.code == http.OK:
             data = json.load(resp.content)
