@@ -21,6 +21,7 @@ class ApiService(object):
         log.msg('Received request: %r' % (dict(request.args,)))
         log.msg('Headers: %r' % (
             dict(request.requestHeaders.getAllRawHeaders()),))
+        log.msg('Received data: %r' % (request.content.read(),))
         return 'hello'
 
 
