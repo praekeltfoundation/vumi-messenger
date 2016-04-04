@@ -42,19 +42,17 @@ class Page(object):
         try:
             data = json.load(fp)
             [msg] = data['entry']['messaging']
-        except ValueError, e:
-            raise UnsupportedMessage('Unable to parse message: %s' % (e,))
-        except KeyError, e:
+        except (ValueError, KeyError), e:
             raise UnsupportedMessage('Unable to parse message: %s' % (e,))
 
-        if ('message' in msg) and ('attachments' in msg['message']):
-            raise UnsupportedMessage('Not supporting attachments yet.')
-        elif 'message' in msg and ('text' in msg['message']):
+        if ('message' in msg) and ('text' in msg['message']):
             return cls(msg['recipient']['id'],
                        msg['sender']['id'],
                        msg['message']['mid'],
                        datetime.fromtimestamp(msg['timestamp'] / 1000),
                        msg['message']['text'])
+        elif ('message' in msg) and ('attachments' in msg['message']):
+            raise UnsupportedMessage('Not supporting attachments yet.')
         elif 'optin' in msg:
             raise UnsupportedMessage('Not supporting optin messages yet.')
         elif 'delivery' in msg:
