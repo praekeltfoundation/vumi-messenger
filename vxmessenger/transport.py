@@ -124,13 +124,12 @@ class MessengerTransport(HttpRpcTransport):
             },
             pool=self.pool)
 
+        data = json.load(resp.content)
         if resp.code == http.OK:
-            data = json.load(resp.content)
             yield self.publish_ack(
                 user_message_id=message['message_id'],
                 sent_message_id=data['message_id'])
         else:
-            data = json.load(resp.content)
             yield self.publish_nack(
                 user_message_id=message['message_id'],
                 sent_message_id=message['message_id'],
