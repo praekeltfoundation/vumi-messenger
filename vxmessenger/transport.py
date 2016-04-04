@@ -38,9 +38,15 @@ class Page(object):
                                        self.timestamp)
 
     @classmethod
-    def read(cls, fp):
-        data = json.load(fp)
-        [msg] = data['entry']['messaging']
+    def from_fp(cls, fp):
+        try:
+            data = json.load(fp)
+            [msg] = data['entry']['messaging']
+        except ValueError, e:
+            raise UnsupportedMessage('Unable to parse message: %s' % (e,))
+        except KeyError, e:
+            raise UnsupportedMessage('Unable to parse message: %s' % (e,))
+
         if ('message' in msg) and ('attachments' in msg['message']):
             raise UnsupportedMessage('Not supporting attachments yet.')
         elif 'message' in msg and ('text' in msg['message']):
@@ -72,6 +78,12 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
+
+    def respond(self, message_id, code, body=None):
+        if body is None:
+            body = {}
+
+        self.finish_request(message_id, json.dumps(body), code=code)
 
     @inlineCallbacks
     def handle_raw_inbound_message(self, message_id, request):
