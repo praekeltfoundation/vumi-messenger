@@ -13,4 +13,5 @@ def home(request):
 
 
 def challenge(request):
+    # Rather use vxmessenger.webhook from the command line
     return HttpResponse(request.GET.get('hub.challenge'))
