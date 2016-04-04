@@ -13,3 +13,11 @@ class DefaultTestCase(TestCase):
                 'hub.mode': 'subscribe',
             })))
         self.assertEqual(response.content, 'challenge')
+
+    def test_privacy(self):
+        response = self.client.get(reverse('privacy'))
+        self.assertTemplateUsed(response, 'privacy.html')
+
+    def test_home(self):
+        response = self.client.get(reverse('home'))
+        self.assertTemplateUsed(response, 'home.html')
