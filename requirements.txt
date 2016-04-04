@@ -3,3 +3,5 @@ click==6.4
 treq==15.1.0
 Django==1.9.5
 psycopg2==2.6.1
+raven<=5.0.0
+dj-database-url==0.4.0
