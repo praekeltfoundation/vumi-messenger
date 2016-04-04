@@ -11,6 +11,7 @@ import treq
 
 from vxmessenger.webhook import WebhookService
 
+
 class TestWebhookService(TestCase):
 
     @inlineCallbacks
