@@ -8,6 +8,7 @@ cache:
 
 env:
   - TZ=UTC
+  - DJANGO_SETTINGS_MODULE=vxmessenger.webapp
 
 install:
   - pip install coveralls
@@ -17,7 +18,7 @@ install:
 
 script:
   - flake8
-  - py.test --cov=vxmessenger --cov-report=term
+  - py.test --ds=vxmessenger.webapp.settings --cov=vxmessenger --cov-report=term
 
 after_success:
   - coveralls
