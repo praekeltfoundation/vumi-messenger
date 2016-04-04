@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '21u=jx-=3#9&7_jue4ocutjq!(8)x2g^wmy*!&d87$_g*9o4r9'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = str(os.environ.get('VXMESSENGER_ENV')).lower() == 'production'
+DEBUG = str(os.environ.get('VXMESSENGER_ENV')).lower() != 'production'
 
 ALLOWED_HOSTS = ['*']
 
