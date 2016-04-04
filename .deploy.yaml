@@ -1,4 +1,5 @@
 buildscript: sideloader/build.sh
 postinstall: sideloader/postinstall.sh
-pip: []
+pip:
+  - gunicorn
 dependencies: []

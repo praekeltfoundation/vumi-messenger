@@ -14,3 +14,13 @@ vxmessenger
 .. image:: https://readthedocs.org/projects/vxmessenger/badge/?version=latest
     :target: https://vxmessenger.readthedocs.org
     :alt: vxmessenger Docs
+
+WebhookService
+--------------
+
+A simple service to respond to Facebook's callbacks when setting up a
+messenger application's webhooks.
+
+    $ python -m vxmessenger.webhook --port 8050 --token mytoken
+
+It'll respond to the initial HTTP call Facebook makes in order to get going.
