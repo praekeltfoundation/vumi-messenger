@@ -1,4 +1,4 @@
-FROM junebug
+FROM qa-mesos-persistence.za.prk-host.net:5000/junebug
 MAINTAINER Praekelt Foundation <dev@praekeltfoundation.org>
 
 COPY . /vxmessenger
