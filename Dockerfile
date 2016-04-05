@@ -7,6 +7,4 @@ RUN pip install -e /vxmessenger
 COPY ./junebug-entrypoint.sh /scripts/
 EXPOSE 80
 
-ENTRYPOINT ["eval-args.sh", "dinit", "junebug-entrypoint.sh"]
-
 CMD []
