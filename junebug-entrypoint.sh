@@ -24,6 +24,5 @@ jb \
     --amqp-port $AMQP_PORT \
     --amqp-user $AMQP_USER \
     --amqp-password $AMQP_PASSWORD \
-    --channels whatsapp:vxyowsup.whatsapp.WhatsAppTransport \
     --channels facebook:vxmessenger.transport.MessengerTransport \
     --logging-path .
