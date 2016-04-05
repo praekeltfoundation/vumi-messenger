@@ -73,6 +73,12 @@ class MessengerTransport(HttpRpcTransport):
     transport_type = 'facebook'
     clock = reactor
 
+    SEND_FAIL_TYPES = {
+        100: 'no_matching_user_found',
+        10: 'application_does_not_have_permissions',
+        2: 'internal_server_error',
+    }
+
     @inlineCallbacks
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
@@ -159,7 +165,8 @@ class MessengerTransport(HttpRpcTransport):
             yield self.add_status(
                 component='outbound',
                 status='down',
-                type='request_fail_unknown',
+                type=self.SEND_FAIL_TYPES.get(
+                    data['error']['code'], 'request_fail_unknown'),
                 message=data['error']['message'])
 
     # These seem to be standard things which allow a Junebug transport
