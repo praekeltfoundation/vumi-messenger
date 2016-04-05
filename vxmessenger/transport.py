@@ -159,8 +159,8 @@ class MessengerTransport(HttpRpcTransport):
             yield self.add_status(
                 component='outbound',
                 status='down',
-                type=self.get_send_fail_type(status['code']),
-                message=status['message'])
+                type='request_fail_unknown',
+                message=data['error']['message'])
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
