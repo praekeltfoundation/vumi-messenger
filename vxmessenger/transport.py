@@ -41,16 +41,18 @@ class Page(object):
     def from_fp(cls, fp):
         try:
             data = json.load(fp)
-            [msg] = data['entry']['messaging']
+            [entry] = data['entry']
+            [msg] = entry['messaging']
         except (ValueError, KeyError), e:
             raise UnsupportedMessage('Unable to parse message: %s' % (e,))
 
         if ('message' in msg) and ('text' in msg['message']):
-            return cls(msg['recipient']['id'],
-                       msg['sender']['id'],
-                       msg['message']['mid'],
-                       datetime.fromtimestamp(msg['timestamp'] / 1000),
-                       msg['message']['text'])
+            return cls(
+                to_addr=msg['recipient']['id'],
+                from_addr=msg['sender']['id'],
+                mid=msg['message']['mid'],
+                content=msg['message']['text'],
+                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000))
         elif ('message' in msg) and ('attachments' in msg['message']):
             raise UnsupportedMessage('Not supporting attachments yet.')
         elif 'optin' in msg:
@@ -69,7 +71,6 @@ class MessengerTransport(HttpRpcTransport):
 
     CONFIG_CLASS = MessengerTransportConfig
     transport_type = 'facebook'
-    base_url = "https://graph.facebook.com/v2.5/me/messages"
     clock = reactor
 
     @inlineCallbacks
@@ -82,6 +83,9 @@ class MessengerTransport(HttpRpcTransport):
             body = {}
 
         self.finish_request(message_id, json.dumps(body), code=code)
+
+    def request(self, method, url, data, **kwargs):
+        return treq.request(method=method, url=url, data=data, **kwargs)
 
     @inlineCallbacks
     def handle_raw_inbound_message(self, message_id, request):
@@ -98,13 +102,14 @@ class MessengerTransport(HttpRpcTransport):
         yield self.publish_message(
             message_id=message_id,
             from_addr=page.from_addr,
+            from_addr_type='facebook_messenger',
             to_addr=page.to_addr,
             content=page.content,
             provider='facebook',
             transport_type=self.transport_type,
             transport_metadata={
                 'messenger': {
-                    'mid': page.message_id,
+                    'mid': page.mid,
                 }
             })
 
@@ -119,14 +124,16 @@ class MessengerTransport(HttpRpcTransport):
     @inlineCallbacks
     def handle_outbound_message(self, message):
         self.emit("MessengerTransport outbound %r" % (message,))
-        resp = yield treq.post(
-            '%s?access_token=%s' % (self.base_url, self.config.access_token),
+        resp = yield self.request(
+            method='POST',
+            url='%s?access_token=%s' % (self.config['outbound_url'],
+                                        self.config['access_token']),
             data=json.dumps({
                 'recipient': {
-                    'id': message.to_addr,
+                    'id': message['to_addr'],
                 },
                 'message': {
-                    'text': message.content,
+                    'text': message['content'],
                 }
             }),
             headers={
@@ -134,16 +141,26 @@ class MessengerTransport(HttpRpcTransport):
             },
             pool=self.pool)
 
-        data = json.load(resp.content)
+        data = yield resp.json()
         if resp.code == http.OK:
             yield self.publish_ack(
                 user_message_id=message['message_id'],
                 sent_message_id=data['message_id'])
+            yield self.add_status(
+                component='outbound',
+                status='ok',
+                type='request_success',
+                message='Request successful')
         else:
             yield self.publish_nack(
                 user_message_id=message['message_id'],
                 sent_message_id=message['message_id'],
                 reason=data['error']['message'])
+            yield self.add_status(
+                component='outbound',
+                status='down',
+                type=self.get_send_fail_type(status['code']),
+                message=status['message'])
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
