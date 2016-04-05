@@ -84,6 +84,13 @@ class MessengerTransport(HttpRpcTransport):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
 
+    @inlineCallbacks
+    def teardown_transport(self):
+        if hasattr(self, 'web_resource'):
+            yield self.web_resource.loseConnection()
+            if self.request_gc.running:
+                self.request_gc.stop()
+
     def respond(self, message_id, code, body=None):
         if body is None:
             body = {}

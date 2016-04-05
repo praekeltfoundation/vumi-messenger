@@ -44,3 +44,4 @@ docs/_build
 .cache/
 /_trial_temp/
 *.sqlite3
+utils/
