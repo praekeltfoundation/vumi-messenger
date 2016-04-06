@@ -7,7 +7,7 @@ from twisted.python import log
 class MessengerPlugin(NginxPlugin):
 
     def start_plugin(self, config, junebug_config):
-        log.msg('Starting plugin: %s, %s.' % (config, junebug_config))
+        log.msg('Starting plugin: %s, %s.' % (config, dict(junebug_config)))
         return super(MessengerPlugin, self).start_plugin(
             config, junebug_config)
 
@@ -17,9 +17,9 @@ class MessengerPlugin(NginxPlugin):
 
     def channel_started(self, channel):
         log.msg('Channel started: %s, %s' % (
-            channel, channel_public_http_properties(channel._properties)))
+            channel.id, channel_public_http_properties(channel._properties)))
         return super(MessengerPlugin, self).channel_started(channel)
 
     def channel_stopped(self, channel):
-        log.msg('Channel stopped: %s' % (channel,))
+        log.msg('Channel stopped: %s' % (channel.id,))
         return super(MessengerPlugin, self).channel_stopped(channel)
