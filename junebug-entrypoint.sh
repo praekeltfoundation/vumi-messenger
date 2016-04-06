@@ -28,5 +28,5 @@ exec jb \
     --channels vumigo:vumi.transports.vumi_bridge.GoConversationTransport \
     --channels facebook:vxmessenger.transport.MessengerTransport \
     --plugin '{"type": "junebug.plugins.nginx.NginxPlugin", "server_name": "_", "vhost_template": "/config/vhost.template"}' \
-    --logfile = ./junebug.log \
+    --log-file ./junebug.log \
     --logging-path .
