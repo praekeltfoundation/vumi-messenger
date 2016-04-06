@@ -7,7 +7,8 @@ from twisted.python import log
 class MessengerPlugin(NginxPlugin):
 
     def start_plugin(self, config, junebug_config):
-        log.msg('Starting plugin: %s, %s.' % (config, dict(junebug_config)))
+        log.msg('Starting plugin: %s, %s.' % (
+            config, junebug_config._config_data))
         return super(MessengerPlugin, self).start_plugin(
             config, junebug_config)
 
