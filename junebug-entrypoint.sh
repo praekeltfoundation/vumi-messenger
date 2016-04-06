@@ -27,6 +27,6 @@ exec jb \
     --channels whatsapp:vxyowsup.whatsapp.WhatsAppTransport \
     --channels vumigo:vumi.transports.vumi_bridge.GoConversationTransport \
     --channels facebook:vxmessenger.transport.MessengerTransport \
-    --plugin '{"type": "junebug.plugins.nginx.NginxPlugin", "server_name": "_", "vhost_template": "/config/vhost.template"}' \
+    --plugin '{"type": "vxmessenger.plugins.MessengerPlugin", "server_name": "_", "vhost_template": "/config/vhost.template"}' \
     --log-file ./junebug.log \
     --logging-path .
