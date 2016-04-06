@@ -17,8 +17,9 @@ class MessengerPlugin(NginxPlugin):
         return super(MessengerPlugin, self).stop_plugin()
 
     def channel_started(self, channel):
-        log.msg('Channel started: %s, %s' % (
-            channel.id, channel_public_http_properties(channel._properties)))
+        log.msg('Channel started: %s, %s from %s' % (
+            channel.id, channel_public_http_properties(channel._properties),
+            channel._properties))
         return super(MessengerPlugin, self).channel_started(channel)
 
     def channel_stopped(self, channel):
