@@ -102,6 +102,12 @@ class MessengerTransport(HttpRpcTransport):
 
     @inlineCallbacks
     def handle_raw_inbound_message(self, message_id, request):
+
+        if 'hub.challenge' in request.args:
+            self.finish_request(message_id, request.args['hub.challenge'][0],
+                                code=http.OK)
+            return
+
         try:
             page = Page.from_fp(request.content)
             self.emit("MessengerTransport inbound %r" % (page,))

@@ -75,6 +75,18 @@ class TestMessengerTransport(VumiTestCase):
         returnValue(transport)
 
     @inlineCallbacks
+    def test_hub_challenge(self):
+        yield self.mk_transport()
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            params={
+                'hub.challenge': 'foo',
+            }
+        )
+        self.assertEqual(res.code, http.OK)
+        self.assertEqual(res.delivered_body, 'foo')
+
+    @inlineCallbacks
     def test_inbound(self):
         yield self.mk_transport()
 
