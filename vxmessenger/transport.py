@@ -160,12 +160,12 @@ class MessengerTransport(HttpRpcTransport):
 
         try:
             page = Page.from_fp(request.content)
-            self.emit("MessengerTransport inbound %r" % (page,))
+            self.log.info("MessengerTransport inbound %r" % (page,))
         except (UnsupportedMessage,), e:
             self.respond(message_id, http.OK, {
                 'warning': 'Accepted unsuppported message: %s' % (e,)
             })
-            self.emit("MessengerTransport failed: %s" % (e,))
+            self.log.error(e)
             return
 
         if self.config.get('retrieve_profile'):
@@ -218,7 +218,7 @@ class MessengerTransport(HttpRpcTransport):
 
     @inlineCallbacks
     def handle_outbound_message(self, message):
-        self.emit("MessengerTransport outbound %r" % (message,))
+        self.log.info("MessengerTransport outbound %r" % (message,))
         resp = yield self.request(
             method='POST',
             url='%s?access_token=%s' % (self.config['outbound_url'],
