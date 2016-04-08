@@ -118,7 +118,7 @@ class MessengerTransport(HttpRpcTransport):
     def setup_welcome_message(self, welcome_message_payload, app_id):
         response = yield self.request(
             'POST',
-            "https://graph.facebook.com/v2.6/%s/thread_settings?%s" % (
+            "https://graph.facebook.com/v2.5/%s/thread_settings?%s" % (
                 app_id,
                 urlencode({
                     'access_token': self.config['access_token'],
