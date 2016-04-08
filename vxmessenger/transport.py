@@ -103,6 +103,7 @@ class MessengerTransport(HttpRpcTransport):
                 yield self.setup_welcome_message(
                     self.config['welcome_message'],
                     self.config['app_id'])
+                self.log.info('Set welcome message.')
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
