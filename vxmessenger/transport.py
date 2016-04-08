@@ -33,17 +33,20 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
 class Page(object):
     """A thing that parses "Page" objects as received from Messenger"""
 
-    def __init__(self, to_addr, from_addr, mid, content, timestamp):
+    def __init__(self, to_addr, from_addr,
+                 mid, content, timestamp, in_reply_to=None):
         self.to_addr = to_addr
         self.from_addr = from_addr
+        self.in_reply_to = in_reply_to
         self.mid = mid
         self.content = content
         self.timestamp = timestamp
 
     def __str__(self):
-        ("<Page to_addr: %s, from_addr: %s, content: %s, "
+        ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, content: %s, "
          "mid: %s, timestamp: %s>") % (self.to_addr,
                                        self.from_addr,
+                                       self.in_reply_to,
                                        self.content,
                                        self.mid,
                                        self.timestamp)
@@ -70,6 +73,16 @@ class Page(object):
             raise UnsupportedMessage('Not supporting optin messages yet.')
         elif 'delivery' in msg:
             raise UnsupportedMessage('Not supporting delivery messages yet.')
+        elif 'postback' in msg:
+            payload = json.loads(msg['postback']['payload'])
+            return cls(
+                to_addr=msg['recipient']['id'],
+                from_addr=msg['recipient']['id'],
+                mid=None,
+                content=payload['content'],
+                in_reply_to=payload.get('in_reply_to'),
+                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000)
+            )
         else:
             raise UnsupportedMessage('Not supporting %r.' % (msg,))
 
@@ -178,6 +191,7 @@ class MessengerTransport(HttpRpcTransport):
             from_addr=page.from_addr,
             from_addr_type='facebook_messenger',
             to_addr=page.to_addr,
+            in_reply_to=page.in_reply_to,
             content=page.content,
             provider='facebook',
             transport_type=self.transport_type,
@@ -216,21 +230,57 @@ class MessengerTransport(HttpRpcTransport):
             self.log.error('Unable to retrieve user profile: %s' % (data,))
             returnValue({})
 
+    def construct_reply(self, message):
+        helper_metadata = message.get('helper_metadata', {})
+        messenger_metadata = helper_metadata.get('messenger', {})
+        if messenger_metadata.get('template_type') == 'button':
+            return self.construct_button_reply(message)
+
+        return self.construct_plain_reply(message)
+
+    def construct_button_reply(self, message):
+        button = message['helper_metadata']['messenger']
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'button',
+                        'text': button['text'],
+                        'buttons': [
+                            {
+                                'type': 'postback',
+                                'title': btn['title'],
+                                'payload': json.dumps(btn['payload']),
+                            } for btn in button['buttons']
+                        ]
+                    }
+                }
+            }
+        }
+
+    def construct_plain_reply(self, message):
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'text': message['content'],
+            }
+        }
+
     @inlineCallbacks
     def handle_outbound_message(self, message):
         self.log.info("MessengerTransport outbound %r" % (message,))
+
         resp = yield self.request(
             method='POST',
             url='%s?access_token=%s' % (self.config['outbound_url'],
                                         self.config['access_token']),
-            data=json.dumps({
-                'recipient': {
-                    'id': message['to_addr'],
-                },
-                'message': {
-                    'text': message['content'],
-                }
-            }),
+            data=json.dumps(self.construct_reply(message)),
             headers={
                 'Content-Type': 'application/json',
             },

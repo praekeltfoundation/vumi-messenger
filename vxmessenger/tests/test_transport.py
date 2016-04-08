@@ -12,6 +12,7 @@ from twisted.web.client import HTTPConnectionPool
 
 from vxmessenger.transport import MessengerTransport
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
+from vumi.tests.helpers import MessageHelper
 
 import treq
 
@@ -56,6 +57,7 @@ class TestMessengerTransport(VumiTestCase):
 
         self.tx_helper = self.add_helper(
             HttpRpcTransportHelper(PatchedMessengerTransport))
+        self.msg_helper = self.add_helper(MessageHelper())
 
         connection_pool = HTTPConnectionPool(reactor, persistent=False)
         treq._utils.set_global_pool(connection_pool)
@@ -167,6 +169,42 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(inbound_status['message'], 'Request successful')
 
     @inlineCallbacks
+    def test_inbound_postback(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "postback": {
+                            "payload": json.dumps({
+                                "content": "1",
+                                "in_reply_to": "12345",
+                            })
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['content'], '1')
+        self.assertEqual(msg['in_reply_to'], '12345')
+
+    @inlineCallbacks
     def test_inbound_with_user_profile(self):
         transport = yield self.mk_transport(
             access_token='the-access-token',
@@ -254,3 +292,76 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(status['component'], 'outbound')
         self.assertEqual(status['type'], 'request_success')
         self.assertEqual(status['message'], 'Request successful')
+
+    @inlineCallbacks
+    def test_construct_plain_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound('hello world', to_addr='123')
+
+        self.assertEqual(
+            transport.construct_plain_reply(msg),
+            {
+                'message': {
+                    'text': 'hello world'
+                },
+                'recipient': {
+                    'id': '123'
+                }
+            })
+
+    @inlineCallbacks
+    def test_construct_button_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'button',
+                    'text': 'hello world',
+                    'buttons': [{
+                        'title': 'Jupiter',
+                        'payload': {
+                            'content': '1',
+                        },
+                    }, {
+                        'title': 'Mars',
+                        'payload': {
+                            'content': '2',
+                        },
+                    }]
+                }
+            })
+
+        self.maxDiff = None
+
+        self.assertEqual(
+            transport.construct_button_reply(msg),
+            {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'attachment': {
+                        'type': 'template',
+                        'payload': {
+                            'template_type': 'button',
+                            'text': 'hello world',
+                            'buttons': [
+                                {
+                                    'type': 'postback',
+                                    'title': 'Jupiter',
+                                    'payload': json.dumps({
+                                        'content': '1',
+                                    }),
+                                },
+                                {
+                                    'type': 'postback',
+                                    'title': 'Mars',
+                                    'payload': json.dumps({
+                                        'content': '2',
+                                    }),
+                                }
+                            ]
+                        }
+                    }
+                }
+            })
