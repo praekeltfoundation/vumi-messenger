@@ -167,6 +167,59 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(inbound_status['message'], 'Request successful')
 
     @inlineCallbacks
+    def test_inbound_with_user_profile(self):
+        transport = yield self.mk_transport(
+            access_token='the-access-token',
+            retrieve_profile=True)
+
+        d = self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "message": {
+                            "mid": "mid.1457764197618:41d102a3e1ae206a38",
+                            "seq": 73,
+                            "text": "hello, world!"
+                        }
+                    }]
+                }]
+            }))
+
+        (request_d, args, kwargs) = yield transport.request_queue.get()
+        method, url, data = args
+        # NOTE: this is the URLencoding
+        self.assertTrue('first_name%2Clast_name%2Cprofile_pic' in url)
+        self.assertTrue('the-access-token' in url)
+        request_d.callback(DummyResponse(200, json.dumps({
+            'first_name': 'first-name',
+            'last_name': 'last-name',
+            'profile_pic': 'rather unpleasant',
+        })))
+
+        res = yield d
+        self.assertEqual(res.code, http.OK)
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['helper_metadata'], {
+            'messenger': {
+                'first_name': 'first-name',
+                'last_name': 'last-name',
+                'profile_pic': 'rather unpleasant'
+            }
+        })
+
+    @inlineCallbacks
     def test_outbound(self):
         transport = yield self.mk_transport(access_token='access_token')
 

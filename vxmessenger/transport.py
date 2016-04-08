@@ -9,7 +9,7 @@ from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vumi.config import ConfigText, ConfigDict
+from vumi.config import ConfigText, ConfigDict, ConfigBool
 from vumi.transports.httprpc import HttpRpcTransport
 
 
@@ -25,6 +25,9 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
         ("The payload for setting up a welcome message. "
          "Requires an app_id to be set"),
         required=False)
+    retrieve_profile = ConfigBool(
+        "Set to true to include the user profile details in "
+        "the helper_metadata", required=False, default=False)
 
 
 class Page(object):
@@ -100,10 +103,10 @@ class MessengerTransport(HttpRpcTransport):
                 self.log.error('app_id is required for welcome_message')
                 return
             try:
-                yield self.setup_welcome_message(
+                data = yield self.setup_welcome_message(
                     self.config['welcome_message'],
                     self.config['app_id'])
-                self.log.info('Set welcome message.')
+                self.log.info('Set welcome message: %s' % (data,))
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
@@ -134,7 +137,7 @@ class MessengerTransport(HttpRpcTransport):
 
         data = yield response.json()
         if response.code == http.OK:
-            returnValue(True)
+            returnValue(data)
 
         raise MessengerTransportException(data)
 
@@ -165,6 +168,11 @@ class MessengerTransport(HttpRpcTransport):
             self.emit("MessengerTransport failed: %s" % (e,))
             return
 
+        if self.config.get('retrieve_profile'):
+            helper_metadata = yield self.get_user_profile(page.from_addr)
+        else:
+            helper_metadata = {}
+
         yield self.publish_message(
             message_id=message_id,
             from_addr=page.from_addr,
@@ -177,6 +185,9 @@ class MessengerTransport(HttpRpcTransport):
                 'messenger': {
                     'mid': page.mid,
                 }
+            },
+            helper_metadata={
+                'messenger': helper_metadata
             })
 
         self.respond(message_id, http.OK, {})
@@ -186,6 +197,24 @@ class MessengerTransport(HttpRpcTransport):
             status='ok',
             type='request_success',
             message='Request successful')
+
+    @inlineCallbacks
+    def get_user_profile(self, user_id):
+        response = yield self.request(
+            method='GET',
+            url='https://graph.facebook.com/v2.5/%s?%s' % (
+                user_id, urlencode({
+                    'fields': 'first_name,last_name,profile_pic',
+                    'access_token': self.config['access_token'],
+                })
+            ),
+            data='')
+        data = yield response.json()
+        if response.code == http.OK:
+            returnValue(data)
+        else:
+            self.log.error('Unable to retrieve user profile: %s' % (data,))
+            returnValue({})
 
     @inlineCallbacks
     def handle_outbound_message(self, message):
