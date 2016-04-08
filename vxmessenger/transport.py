@@ -1,14 +1,15 @@
 import json
 from datetime import datetime
+from urllib import urlencode
 
 import treq
 
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks
+from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vumi.config import ConfigText
+from vumi.config import ConfigText, ConfigDict
 from vumi.transports.httprpc import HttpRpcTransport
 
 
@@ -17,6 +18,13 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
     access_token = ConfigText(
         "The access_token for the Messenger API",
         required=True)
+    app_id = ConfigText(
+        "The app id for the Messenger API",
+        required=False)
+    welcome_message = ConfigDict(
+        ("The payload for setting up a welcome message. "
+         "Requires an app_id to be set"),
+        required=False)
 
 
 class Page(object):
@@ -63,7 +71,11 @@ class Page(object):
             raise UnsupportedMessage('Not supporting %r.' % (msg,))
 
 
-class UnsupportedMessage(Exception):
+class MessengerTransportException(Exception):
+    pass
+
+
+class UnsupportedMessage(MessengerTransportException):
     pass
 
 
@@ -83,6 +95,16 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
+        if self.config.get('welcome_message'):
+            if not self.config.get('app_id'):
+                self.log.error('app_id is required for welcome_message')
+                return
+            try:
+                yield self.setup_welcome_message(
+                    self.config['welcome_message'],
+                    self.config['app_id'])
+            except (MessengerTransport,), e:
+                self.log.error('Failed to setup welcome message: %s' % (e,))
 
     @inlineCallbacks
     def teardown_transport(self):
@@ -90,6 +112,30 @@ class MessengerTransport(HttpRpcTransport):
             yield self.web_resource.loseConnection()
             if self.request_gc.running:
                 self.request_gc.stop()
+
+    @inlineCallbacks
+    def setup_welcome_message(self, welcome_message_payload, app_id):
+        response = yield self.request(
+            'POST',
+            "https://graph.facebook.com/v2.6/%s/thread_settings?%s" % (
+                app_id,
+                urlencode({
+                    'access_token': self.config['access_token'],
+                })),
+            data=json.dumps({
+                'setting_type': 'call_to_actions',
+                'thread_state': 'new_thread',
+                'call_to_actions': welcome_message_payload
+            }),
+            headers={
+                'Content-Type': ['application/json']
+            })
+
+        data = yield response.json()
+        if response.code == http.OK:
+            returnValue(True)
+
+        raise MessengerTransportException(data)
 
     def respond(self, message_id, code, body=None):
         if body is None:

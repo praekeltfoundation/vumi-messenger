@@ -28,6 +28,18 @@ class DummyResponse(object):
         return d
 
 
+class PatchedMessengerTransport(MessengerTransport):
+
+    def __init__(self, *args, **kwargs):
+        super(PatchedMessengerTransport, self).__init__(*args, **kwargs)
+        self.request_queue = DeferredQueue()
+
+    def request(self, method, url, data, **kwargs):
+        d = Deferred()
+        self.request_queue.put((d, (method, url, data), kwargs))
+        return d
+
+
 class TestMessengerTransport(VumiTestCase):
 
     timeout = 1
@@ -43,7 +55,7 @@ class TestMessengerTransport(VumiTestCase):
         self.addCleanup(self.remote_server.stop)
 
         self.tx_helper = self.add_helper(
-            HttpRpcTransportHelper(MessengerTransport))
+            HttpRpcTransportHelper(PatchedMessengerTransport))
 
         connection_pool = HTTPConnectionPool(reactor, persistent=False)
         treq._utils.set_global_pool(connection_pool)
@@ -62,16 +74,6 @@ class TestMessengerTransport(VumiTestCase):
 
         transport = yield self.tx_helper.get_transport(config)
         transport.clock = self.clock
-
-        transport.request_queue = DeferredQueue()
-
-        def patched_request(*args, **kwargs):
-            d = Deferred()
-            transport.request_queue.put([d, args, kwargs])
-            return d
-
-        self.patch(transport, 'request', patched_request)
-
         returnValue(transport)
 
     @inlineCallbacks
@@ -85,6 +87,28 @@ class TestMessengerTransport(VumiTestCase):
         )
         self.assertEqual(res.code, http.OK)
         self.assertEqual(res.delivered_body, 'foo')
+
+    @inlineCallbacks
+    def test_setup_welcome_message(self):
+        transport = yield self.mk_transport(
+            access_token='access-token')
+        d = transport.setup_welcome_message({
+            'message': {
+                'text': 'This is the welcome message!'
+            }
+        }, 'app-id')
+
+        (request_d, args, kwargs) = yield transport.request_queue.get()
+        request_d.callback(DummyResponse(200, json.dumps({})))
+        method, url, data = args
+        self.assertTrue('app-id' in url)
+        self.assertTrue('?access_token=access-token' in url)
+        self.assertEqual(json.loads(data)['call_to_actions'], {
+            'message': {
+                'text': 'This is the welcome message!'
+            }
+        })
+        yield d
 
     @inlineCallbacks
     def test_inbound(self):
@@ -152,7 +176,8 @@ class TestMessengerTransport(VumiTestCase):
             content='hi')
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
-        self.assertEqual(json.loads(kwargs['data']), {
+        method, url, data = args
+        self.assertEqual(json.loads(data), {
             'message': {
                 'text': 'hi',
             },
