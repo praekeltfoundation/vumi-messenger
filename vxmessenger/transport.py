@@ -68,11 +68,14 @@ class Page(object):
                 content=msg['message']['text'],
                 timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000))
         elif ('message' in msg) and ('attachments' in msg['message']):
-            raise UnsupportedMessage('Not supporting attachments yet.')
+            raise UnsupportedMessage(
+                'Not supporting attachments yet: %s.' % (data,))
         elif 'optin' in msg:
-            raise UnsupportedMessage('Not supporting optin messages yet.')
+            raise UnsupportedMessage(
+                'Not supporting optin messages yet: %s.' % (data,))
         elif 'delivery' in msg:
-            raise UnsupportedMessage('Not supporting delivery messages yet.')
+            raise UnsupportedMessage(
+                'Not supporting delivery messages yet: %s.' % (data,))
         elif 'postback' in msg:
             payload = json.loads(msg['postback']['payload'])
             return cls(
@@ -84,7 +87,8 @@ class Page(object):
                 timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000)
             )
         else:
-            raise UnsupportedMessage('Not supporting %r.' % (msg,))
+            raise UnsupportedMessage(
+                'Not supporting %r.: %s.' % (data,))
 
 
 class MessengerTransportException(Exception):
