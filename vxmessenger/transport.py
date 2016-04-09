@@ -236,6 +236,9 @@ class MessengerTransport(HttpRpcTransport):
         if messenger_metadata.get('template_type') == 'button':
             return self.construct_button_reply(message)
 
+        if messenger_metadata.get('template_type') == 'generic':
+            return self.construct_generic_reply(message)
+
         return self.construct_plain_reply(message)
 
     def construct_button_reply(self, message):
@@ -250,6 +253,31 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'button',
                         'text': button['text'],
+                        'buttons': [
+                            {
+                                'type': 'postback',
+                                'title': btn['title'],
+                                'payload': json.dumps(btn['payload']),
+                            } for btn in button['buttons']
+                        ]
+                    }
+                }
+            }
+        }
+
+    def construct_generic_reply(self, message):
+        button = message['helper_metadata']['messenger']
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'generic',
+                        'title': button['text'],
+                        'image_url': button.get('image_url'),
                         'buttons': [
                             {
                                 'type': 'postback',
