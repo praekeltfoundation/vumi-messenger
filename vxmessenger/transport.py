@@ -287,6 +287,7 @@ class MessengerTransport(HttpRpcTransport):
             pool=self.pool)
 
         data = yield resp.json()
+        self.log.info('API reply: %s' % (data,))
         if resp.code == http.OK:
             yield self.publish_ack(
                 user_message_id=message['message_id'],
