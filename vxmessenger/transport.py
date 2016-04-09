@@ -77,7 +77,7 @@ class Page(object):
             payload = json.loads(msg['postback']['payload'])
             return cls(
                 to_addr=msg['recipient']['id'],
-                from_addr=msg['recipient']['id'],
+                from_addr=msg['sender']['id'],
                 mid=None,
                 content=payload['content'],
                 in_reply_to=payload.get('in_reply_to'),
@@ -275,12 +275,13 @@ class MessengerTransport(HttpRpcTransport):
     @inlineCallbacks
     def handle_outbound_message(self, message):
         self.log.info("MessengerTransport outbound %r" % (message,))
-
+        reply = self.construct_reply(message)
+        self.log.info("Reply: %s" % (reply,))
         resp = yield self.request(
             method='POST',
             url='%s?access_token=%s' % (self.config['outbound_url'],
                                         self.config['access_token']),
-            data=json.dumps(self.construct_reply(message)),
+            data=json.dumps(reply),
             headers={
                 'Content-Type': 'application/json',
             },
