@@ -277,7 +277,8 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'generic',
                         'elements': [{
-                            'title': button['text'],
+                            'title': button['title'],
+                            'subtitle': button['subtitle'],
                             'image_url': button.get('image_url'),
                             'buttons': [
                                 {
