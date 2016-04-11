@@ -356,7 +356,6 @@ class MessengerTransport(HttpRpcTransport):
             type=status_type,
             message=reason)
 
-
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
 
