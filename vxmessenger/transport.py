@@ -6,6 +6,7 @@ import treq
 
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.error import TimeoutError
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
@@ -312,38 +313,49 @@ class MessengerTransport(HttpRpcTransport):
         self.log.info("MessengerTransport outbound %r" % (message,))
         reply = self.construct_reply(message)
         self.log.info("Reply: %s" % (reply,))
-        resp = yield self.request(
-            method='POST',
-            url='%s?access_token=%s' % (self.config['outbound_url'],
-                                        self.config['access_token']),
-            data=json.dumps(reply),
-            headers={
-                'Content-Type': 'application/json',
-            },
-            pool=self.pool)
+        try:
+            resp = yield self.request(
+                method='POST',
+                url='%s?access_token=%s' % (self.config['outbound_url'],
+                                            self.config['access_token']),
+                data=json.dumps(reply),
+                headers={
+                    'Content-Type': 'application/json',
+                },
+                pool=self.pool)
 
-        data = yield resp.json()
-        self.log.info('API reply: %s' % (data,))
-        if resp.code == http.OK:
-            yield self.publish_ack(
-                user_message_id=message['message_id'],
-                sent_message_id=data['message_id'])
-            yield self.add_status(
-                component='outbound',
-                status='ok',
-                type='request_success',
-                message='Request successful')
-        else:
-            yield self.publish_nack(
-                user_message_id=message['message_id'],
-                sent_message_id=message['message_id'],
-                reason=data['error']['message'])
-            yield self.add_status(
-                component='outbound',
-                status='down',
-                type=self.SEND_FAIL_TYPES.get(
-                    data['error']['code'], 'request_fail_unknown'),
-                message=data['error']['message'])
+            data = yield resp.json()
+            self.log.info('API reply: %s' % (data,))
+
+            if resp.code == http.OK:
+                yield self.publish_ack(
+                    user_message_id=message['message_id'],
+                    sent_message_id=data['message_id'])
+                yield self.add_status(
+                    component='outbound',
+                    status='ok',
+                    type='request_success',
+                    message='Request successful')
+            else:
+                yield self.nack(
+                    message, data['error']['message'],
+                    self.SEND_FAIL_TYPES.get(
+                        data['error']['code'], 'request_fail_unknown'))
+        except (TimeoutError,), e:
+            yield self.nack(message, e, 'request_fail_unknown')
+
+    @inlineCallbacks
+    def nack(self, message, reason, status_type):
+        yield self.publish_nack(
+            user_message_id=message['message_id'],
+            sent_message_id=message['message_id'],
+            reason=reason)
+        yield self.add_status(
+            component='outbound',
+            status='down',
+            type=status_type,
+            message=reason)
+
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
