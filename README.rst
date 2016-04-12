@@ -15,12 +15,61 @@ vxmessenger
     :target: https://vxmessenger.readthedocs.org
     :alt: vxmessenger Docs
 
-WebhookService
---------------
+Vumi Messenger Transport
+========================
 
-A simple service to respond to Facebook's callbacks when setting up a
-messenger application's webhooks.
+All of Vumi's applications can be surfaced on Messenger with the Messenger Transport.
+It provides a great experience for interactive mobile conversations at scale.
 
-    $ python -m vxmessenger.webhook --port 8050 --token mytoken
 
-It'll respond to the initial HTTP call Facebook makes in order to get going.
+Getting Started
+===============
+
+Install Junebug_, the standalone Vumi transport launcher and the Vumi Transport::
+
+    $ apt-get install redis-server rabbitmq-server
+    $ pip install junebug
+    $ pip install vumi-messenger
+
+Launch the Junebug service with thet Vumi Messenger channel configured::
+
+    $ jb -p 8000 --channels facebook:vxmessenger.transport.MessengerTransport
+
+Using the template, below and update your FB_APP_ID, FB_ACCESS_TOKEN and
+save it as a file called ``config.json``:
+
+..code::
+    json
+
+    {
+      "type": "facebook",
+      "amqp_queue": "messenger_transport",
+      "public_http": {
+        "enabled": true,
+        "web_path": "/api",
+        "web_port": 8051
+      },
+      "config": {
+        "web_path": "/api",
+        "web_port": 8051,
+        "noisy": true,
+        "app_id": "YOUR_FB_APP_ID",
+        "retrieve_profile": true,
+        "welcome_message": [{
+          "message": {
+            "text": "Hi :) Welcome to our Messenger Bot!"
+          }
+        }],
+        "outbound_url": "https://graph.facebook.com/v2.5/me/messages",
+        "access_token": "YOUR_FB_ACCESS_TOKEN"
+      }
+    }
+
+Post it to Junebug to start the channel::
+
+    $ curl -X POST -d@config.json http://localhost:8000/channels/
+
+You're now able to communicate with Facebook's Messenger API and can offer
+your Vumi application there.
+
+.. _Junebug:: http://junebug.readthedocs.org
