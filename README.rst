@@ -1,18 +1,18 @@
 Vumi Messenger Transport
 ========================
 
-.. image:: https://img.shields.io/travis/praekeltfoundation/vxmessenger.svg
-        :target: https://travis-ci.org/praekeltfoundation/vxmessenger
+.. image:: https://img.shields.io/travis/praekeltfoundation/vumi-messenger.svg
+        :target: https://travis-ci.org/praekeltfoundation/vumi-messenger
 
 .. image:: https://img.shields.io/pypi/v/vxmessenger.svg
         :target: https://pypi.python.org/pypi/vxmessenger
 
-.. image:: https://coveralls.io/repos/praekeltfoundation/vxmessenger/badge.png?branch=develop
-    :target: https://coveralls.io/r/praekeltfoundation/vxmessenger?branch=develop
+.. image:: https://coveralls.io/repos/praekeltfoundation/vumi-messenger/badge.png?branch=develop
+    :target: https://coveralls.io/r/praekeltfoundation/vumi-messenger?branch=develop
     :alt: Code Coverage
 
-.. image:: https://readthedocs.org/projects/vxmessenger/badge/?version=latest
-    :target: https://vxmessenger.readthedocs.org
+.. image:: https://readthedocs.org/projects/vumi-facebook-messenger/badge/?version=latest
+    :target: http://vumi-facebook-messenger.readthedocs.org/
     :alt: vxmessenger Docs
 
 All of Vumi's applications can be surfaced on Messenger with the Messenger Transport.
