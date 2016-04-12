@@ -33,7 +33,9 @@ Install Junebug_, the standalone Vumi transport launcher and the Vumi Transport:
 
 Launch the Junebug service with thet Vumi Messenger channel configured::
 
-    $ jb -p 8000 --channels facebook:vxmessenger.transport.MessengerTransport
+    $ jb -p 8000 \
+        --channels facebook:vxmessenger.transport.MessengerTransport \
+        --logging-path .
 
 Using the template, below and update your FB_APP_ID, FB_ACCESS_TOKEN and
 save it as a file called ``config.json``:
