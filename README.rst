@@ -38,8 +38,7 @@ Launch the Junebug service with thet Vumi Messenger channel configured::
 Using the template, below and update your FB_APP_ID, FB_ACCESS_TOKEN and
 save it as a file called ``config.json``:
 
-..code::
-    json
+.. code-block:: json
 
     {
       "type": "facebook",
