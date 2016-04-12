@@ -22,11 +22,11 @@ It provides a great experience for interactive mobile conversations at scale.
 Getting Started
 ===============
 
-Install Junebug_, the standalone Vumi transport launcher and the Vumi Transport::
+Install Junebug_, the standalone Vumi transport launcher and the Facebook Messenger Transport::
 
     $ apt-get install redis-server rabbitmq-server
     $ pip install junebug
-    $ pip install vumi-messenger
+    $ pip install vxmessenger
 
 Launch the Junebug service with thet Vumi Messenger channel configured::
 
