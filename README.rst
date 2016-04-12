@@ -71,4 +71,4 @@ Post it to Junebug to start the channel::
 You're now able to communicate with Facebook's Messenger API and can offer
 your Vumi application there.
 
-.. _Junebug:: http://junebug.readthedocs.org
+.. _Junebug: http://junebug.readthedocs.org
