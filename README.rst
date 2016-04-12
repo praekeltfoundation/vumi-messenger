@@ -92,6 +92,10 @@ Vumi message:
 A Button Reply
 ~~~~~~~~~~~~~~
 
+Please be aware of the limitations_ that Facebook applies to these messages.
+A call to action may only have a maximum of 3 buttons and character count
+limits appy.
+
 .. code-block:: python
 
     self.publish_message(
@@ -109,5 +113,31 @@ A Button Reply
             }
         })
 
+A Generic Reply
+~~~~~~~~~~~~~~
+
+Please be aware of the limitations_ that Facebook applies to these messages.
+A call to action may only have a maximum of 3 buttons and character count
+limits appy.
+
+.. code-block:: python
+
+    self.publish_message(
+        helper_metadata={
+            'messenger': {
+                'template_type': 'generic'
+                'title': 'The title',
+                'subtitle': 'The subtitle',
+                'image_url': 'The image_url to use', # This can be left blank
+                'buttons': [{
+                    'title': 'Button 1',
+                    'payload': {
+                        'content': 'The content expected when a button is pressed',
+                        'in_reply_to': 'The ID of the previous message' # This can be left blank
+                    }
+                }]
+            }
+        })
 
 .. _Junebug: http://junebug.readthedocs.org
+.. _limitations: https://developers.facebook.com/docs/messenger-platform/send-api-reference#guidelines
