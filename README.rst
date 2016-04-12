@@ -71,4 +71,43 @@ Post it to Junebug to start the channel::
 You're now able to communicate with Facebook's Messenger API and can offer
 your Vumi application there.
 
+How about hooking up a simple game of hangman?::
+
+    $ twistd -n vumi_worker \
+        --worker-class=vumi.demos.hangman.HangmanWorker \
+        --set-option=random_word_url:http://randomword.setgetgo.com/get.php \
+        --set-option=transport_name:messenger_transport \
+        --set-option=worker_name:hangman
+
+
+Richer Templates
+================
+
+The Vumi Messenger Transport allows one to use the richer templates available,
+including texts, images, hyperlinks and buttons.
+
+To make use of these add the relevant ``helper_metadata`` to your outbound
+Vumi message:
+
+A Button Reply
+~~~~~~~~~~~~~~
+
+.. code-block:: python
+
+    self.publish_message(
+        helper_metadata={
+            'messenger': {
+                'template_type': 'button'
+                'text': 'The accompanying text with the button',
+                'buttons': [{
+                    'title': 'Button 1',
+                    'payload': {
+                        'content': 'The content expected when a button is pressed',
+                        'in_reply_to': 'The ID of the previous message' # This can be left blank
+                    }
+                }]
+            }
+        })
+
+
 .. _Junebug: http://junebug.readthedocs.org
