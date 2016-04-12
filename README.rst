@@ -68,9 +68,29 @@ Post it to Junebug to start the channel::
     $ curl -X POST -d@config.json http://localhost:8000/channels/
 
 You're now able to communicate with Facebook's Messenger API and can offer
-your Vumi application there.
+bot access to your Vumi application.
 
-How about hooking up a simple game of hangman?::
+Facebook will want to verify your application, for that to work make sure it's served over SSL.
+The API URL is::
+
+    http://localhost:8051/api
+
+If you've used a different ``web_port`` and ``web_path`` parameter you'll need to update the URL accordingly.
+
+.. note::
+
+    There is also a Dockerfile available that you can customise to run
+    Junebug in a Docker container: http://github.com/praekeltfoundation/docker-junebug
+
+    The Docker container includes Nginx and offers the Junebug_ API under the
+    ``/jb/`` endpoint, all other transports are made available from the root path.
+    For the example above the endpoint would be ``/api`` on port 80.
+
+Hook up an Application to your Messenger integration
+====================================================
+
+All Vumi applications can be surfaced on Facebook Messenger as bots, how about
+hooking up a simple game of hangman?::
 
     $ twistd -n vumi_worker \
         --worker-class=vumi.demos.hangman.HangmanWorker \
@@ -78,6 +98,20 @@ How about hooking up a simple game of hangman?::
         --set-option=transport_name:messenger_transport \
         --set-option=worker_name:hangman
 
+Javascript Sandbox applications are also available.
+Check out some of the examples below:
+
+Sample FAQ browser
+    https://github.com/smn/faqbrowser-docker
+
+Sample Service rating application
+    https://github.com/smn/servicerating-docker
+
+.. note::
+
+    Do you want to expose multiple applications within a single Bot?
+    The Vumi Application Router allows you to do exactly that, have a look
+    at the `example router specifically for Facebook Messenger <https://github.com/smn/vumi-app-router>`_.
 
 Richer Templates
 ================
