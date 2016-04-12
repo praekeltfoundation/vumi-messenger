@@ -58,7 +58,7 @@ save it as a file called ``config.json``:
             "text": "Hi :) Welcome to our Messenger Bot!"
           }
         }],
-        "outbound_url": "https://graph.facebook.com/v2.5/me/messages",
+        "outbound_url": "https://graph.facebook.com/v2.6/me/messages",
         "access_token": "YOUR_FB_ACCESS_TOKEN"
       }
     }
