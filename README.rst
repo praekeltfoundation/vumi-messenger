@@ -1,5 +1,5 @@
-vxmessenger
-=============================
+Vumi Messenger Transport
+========================
 
 .. image:: https://img.shields.io/travis/praekeltfoundation/vxmessenger.svg
         :target: https://travis-ci.org/praekeltfoundation/vxmessenger
@@ -14,9 +14,6 @@ vxmessenger
 .. image:: https://readthedocs.org/projects/vxmessenger/badge/?version=latest
     :target: https://vxmessenger.readthedocs.org
     :alt: vxmessenger Docs
-
-Vumi Messenger Transport
-========================
 
 All of Vumi's applications can be surfaced on Messenger with the Messenger Transport.
 It provides a great experience for interactive mobile conversations at scale.
