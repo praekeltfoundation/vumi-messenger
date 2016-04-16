@@ -282,17 +282,17 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'generic',
                         'elements': [{
-                            'title': button['title'],
-                            'subtitle': button['subtitle'],
-                            'image_url': button.get('image_url'),
+                            'title': element['title'],
+                            'subtitle': element['subtitle'],
+                            'image_url': element.get('image_url'),
                             'buttons': [
                                 {
                                     'type': 'postback',
                                     'title': btn['title'],
                                     'payload': json.dumps(btn['payload']),
-                                } for btn in button['buttons']
+                                } for btn in element['buttons']
                             ]
-                        }]
+                        } for element in button['elements']]
                     }
                 }
             }

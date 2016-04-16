@@ -331,8 +331,6 @@ class TestMessengerTransport(VumiTestCase):
                 }
             })
 
-        self.maxDiff = None
-
         self.assertEqual(
             transport.construct_button_reply(msg),
             {
@@ -361,6 +359,67 @@ class TestMessengerTransport(VumiTestCase):
                                     }),
                                 }
                             ]
+                        }
+                    }
+                }
+            })
+
+    @inlineCallbacks
+    def test_construct_generic_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'generic',
+                    'elements': [{
+                        'title': 'hello world',
+                        'subtitle': 'arf',
+                        'buttons': [{
+                            'title': 'Jupiter',
+                            'payload': {
+                                'content': '1',
+                            },
+                        }, {
+                            'title': 'Mars',
+                            'payload': {
+                                'content': '2',
+                            },
+                        }]
+                    }]
+                }
+            })
+
+        self.maxDiff = None
+
+        self.assertEqual(
+            transport.construct_generic_reply(msg),
+            {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'attachment': {
+                        'type': 'template',
+                        'payload': {
+                            'template_type': 'generic',
+                            'elements': [{
+                                'title': 'hello world',
+                                'subtitle': 'arf',
+                                'image_url': None,
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Jupiter',
+                                    'payload': json.dumps({
+                                        'content': '1',
+                                    }),
+                                }, {
+                                    'type': 'postback',
+                                    'title': 'Mars',
+                                    'payload': json.dumps({
+                                        'content': '2',
+                                    }),
+                                }]
+                            }]
                         }
                     }
                 }
