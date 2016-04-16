@@ -159,16 +159,18 @@ limits appy.
         helper_metadata={
             'messenger': {
                 'template_type': 'generic'
-                'title': 'The title',
-                'subtitle': 'The subtitle',
-                'image_url': 'The image_url to use', # This can be left blank
-                'buttons': [{
-                    'title': 'Button 1',
-                    'payload': {
-                        'content': 'The content expected when a button is pressed',
-                        'in_reply_to': 'The ID of the previous message' # This can be left blank
-                    }
-                }]
+                'elements': [
+                    'title': 'The title',
+                    'subtitle': 'The subtitle',
+                    'image_url': 'The image_url to use', # This can be left blank
+                    'buttons': [{
+                        'title': 'Button 1',
+                        'payload': {
+                            'content': 'The content expected when a button is pressed',
+                            'in_reply_to': 'The ID of the previous message' # This can be left blank
+                        }
+                    }]
+                ]
             }
         })
 
