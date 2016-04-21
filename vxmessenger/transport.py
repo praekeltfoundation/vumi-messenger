@@ -25,6 +25,9 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
         "The page id for the Messenger API",
         required=False,
         fallbacks=[SingleFieldFallback("app_id")])
+    app_id = ConfigText(
+        "DEPRECATED The page app id for the Messenger API",
+        required=False)
     welcome_message = ConfigDict(
         ("The payload for setting up a welcome message. "
          "Requires a page_id to be set"),
