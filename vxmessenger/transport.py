@@ -4,6 +4,8 @@ from urllib import urlencode
 
 import treq
 
+
+from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.error import TimeoutError
@@ -19,12 +21,16 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
     access_token = ConfigText(
         "The access_token for the Messenger API",
         required=True)
+    page_id = ConfigText(
+        "The page id for the Messenger API",
+        required=False,
+        fallbacks=[SingleFieldFallback("app_id")])
     app_id = ConfigText(
-        "The app id for the Messenger API",
+        "DEPRECATED The page app id for the Messenger API",
         required=False)
     welcome_message = ConfigDict(
         ("The payload for setting up a welcome message. "
-         "Requires an app_id to be set"),
+         "Requires a page_id to be set"),
         required=False)
     retrieve_profile = ConfigBool(
         "Set to true to include the user profile details in "
@@ -117,13 +123,13 @@ class MessengerTransport(HttpRpcTransport):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
         if self.config.get('welcome_message'):
-            if not self.config.get('app_id'):
-                self.log.error('app_id is required for welcome_message')
+            if not self.config.get('page_id'):
+                self.log.error('page_id is required for welcome_message')
                 return
             try:
                 data = yield self.setup_welcome_message(
                     self.config['welcome_message'],
-                    self.config['app_id'])
+                    self.config['page_id'])
                 self.log.info('Set welcome message: %s' % (data,))
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
@@ -136,11 +142,11 @@ class MessengerTransport(HttpRpcTransport):
                 self.request_gc.stop()
 
     @inlineCallbacks
-    def setup_welcome_message(self, welcome_message_payload, app_id):
+    def setup_welcome_message(self, welcome_message_payload, page_id):
         response = yield self.request(
             'POST',
-            "https://graph.facebook.com/v2.5/%s/thread_settings?%s" % (
-                app_id,
+            "https://graph.facebook.com/v2.6/%s/thread_settings?%s" % (
+                page_id,
                 urlencode({
                     'access_token': self.config['access_token'],
                 })),
@@ -221,7 +227,7 @@ class MessengerTransport(HttpRpcTransport):
     def get_user_profile(self, user_id):
         response = yield self.request(
             method='GET',
-            url='https://graph.facebook.com/v2.5/%s?%s' % (
+            url='https://graph.facebook.com/v2.6/%s?%s' % (
                 user_id, urlencode({
                     'fields': 'first_name,last_name,profile_pic',
                     'access_token': self.config['access_token'],
