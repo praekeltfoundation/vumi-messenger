@@ -139,7 +139,7 @@ class MessengerTransport(HttpRpcTransport):
     def setup_welcome_message(self, welcome_message_payload, app_id):
         response = yield self.request(
             'POST',
-            "https://graph.facebook.com/v2.5/%s/thread_settings?%s" % (
+            "https://graph.facebook.com/v2.6/%s/thread_settings?%s" % (
                 app_id,
                 urlencode({
                     'access_token': self.config['access_token'],
@@ -221,7 +221,7 @@ class MessengerTransport(HttpRpcTransport):
     def get_user_profile(self, user_id):
         response = yield self.request(
             method='GET',
-            url='https://graph.facebook.com/v2.5/%s?%s' % (
+            url='https://graph.facebook.com/v2.6/%s?%s' % (
                 user_id, urlencode({
                     'fields': 'first_name,last_name,profile_pic',
                     'access_token': self.config['access_token'],
