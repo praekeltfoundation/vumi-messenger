@@ -34,7 +34,7 @@ Launch the Junebug service with thet Vumi Messenger channel configured::
         --channels facebook:vxmessenger.transport.MessengerTransport \
         --logging-path .
 
-Using the template, below and update your FB_APP_ID, FB_ACCESS_TOKEN and
+Using the template, below and update your FB_PAGE_ID, FB_ACCESS_TOKEN and
 save it as a file called ``config.json``:
 
 .. code-block:: json
@@ -51,7 +51,7 @@ save it as a file called ``config.json``:
         "web_path": "/api",
         "web_port": 8051,
         "noisy": true,
-        "app_id": "YOUR_FB_PAGE_APP_ID",
+        "page_id": "YOUR_FB_PAGE_ID",
         "retrieve_profile": true,
         "welcome_message": [{
           "message": {
