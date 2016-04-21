@@ -51,7 +51,7 @@ save it as a file called ``config.json``:
         "web_path": "/api",
         "web_port": 8051,
         "noisy": true,
-        "app_id": "YOUR_FB_APP_ID",
+        "app_id": "YOUR_FB_PAGE_APP_ID",
         "retrieve_profile": true,
         "welcome_message": [{
           "message": {
