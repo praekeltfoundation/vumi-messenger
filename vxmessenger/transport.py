@@ -50,7 +50,7 @@ class Page(object):
         self.timestamp = timestamp
 
     def __str__(self):
-        ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, content: %s, "
+        return ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, content: %s, "
          "mid: %s, timestamp: %s>") % (self.to_addr,
                                        self.from_addr,
                                        self.in_reply_to,
@@ -252,6 +252,20 @@ class MessengerTransport(HttpRpcTransport):
 
         return self.construct_plain_reply(message)
 
+    def construct_button(self, btn):
+        typ = btn.get('type', 'postback')
+        ret = {
+            'type': typ,
+            'title': btn['title'],
+        }
+        if typ == 'postback':
+            ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
+        elif typ == 'web_url':
+            ret['url'] = btn['url']
+        else:
+            raise UnsupportedMessage('Unknown button type "%s"' % typ)
+        return ret
+
     def construct_button_reply(self, message):
         button = message['helper_metadata']['messenger']
         return {
@@ -264,13 +278,8 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'button',
                         'text': button['text'],
-                        'buttons': [
-                            {
-                                'type': 'postback',
-                                'title': btn['title'],
-                                'payload': json.dumps(btn['payload']),
-                            } for btn in button['buttons']
-                        ]
+                        'buttons': [self.construct_button(btn)
+                                    for btn in button['buttons']]
                     }
                 }
             }
@@ -289,15 +298,10 @@ class MessengerTransport(HttpRpcTransport):
                         'template_type': 'generic',
                         'elements': [{
                             'title': element['title'],
-                            'subtitle': element['subtitle'],
+                            'subtitle': element.get('subtitle'),
                             'image_url': element.get('image_url'),
-                            'buttons': [
-                                {
-                                    'type': 'postback',
-                                    'title': btn['title'],
-                                    'payload': json.dumps(btn['payload']),
-                                } for btn in element['buttons']
-                            ]
+                            'buttons': [self.construct_button(btn)
+                                        for btn in element['buttons']]
                         } for element in button['elements']]
                     }
                 }

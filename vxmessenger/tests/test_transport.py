@@ -10,7 +10,7 @@ from twisted.internet.task import Clock
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vxmessenger.transport import MessengerTransport
+from vxmessenger.transport import MessengerTransport, UnsupportedMessage
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
 from vumi.tests.helpers import MessageHelper
 
@@ -323,10 +323,9 @@ class TestMessengerTransport(VumiTestCase):
                             'content': '1',
                         },
                     }, {
+                        'type': 'web_url',
                         'title': 'Mars',
-                        'payload': {
-                            'content': '2',
-                        },
+                        'url': 'http://test',
                     }]
                 }
             })
@@ -347,22 +346,43 @@ class TestMessengerTransport(VumiTestCase):
                                 {
                                     'type': 'postback',
                                     'title': 'Jupiter',
-                                    'payload': json.dumps({
-                                        'content': '1',
-                                    }),
+                                    'payload': '{"content":"1"}',
                                 },
                                 {
-                                    'type': 'postback',
+                                    'type': 'web_url',
                                     'title': 'Mars',
-                                    'payload': json.dumps({
-                                        'content': '2',
-                                    }),
+                                    'url': 'http://test',
                                 }
                             ]
                         }
                     }
                 }
             })
+
+    @inlineCallbacks
+    def test_construct_bad_button(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'button',
+                    'text': 'hello world',
+                    'buttons': [{
+                        'title': 'Jupiter',
+                        'payload': {
+                            'content': '1',
+                        },
+                    }, {
+                        'type': 'unknown',
+                        'title': 'Mars',
+                    }]
+                }
+            })
+
+        with self.assertRaisesRegexp(
+                UnsupportedMessage,
+                'Unknown button type "unknown"'):
+            transport.construct_button_reply(msg)
 
     @inlineCallbacks
     def test_construct_generic_reply(self):
@@ -380,12 +400,25 @@ class TestMessengerTransport(VumiTestCase):
                                 'content': '1',
                             },
                         }, {
+                            'type': 'web_url',
                             'title': 'Mars',
-                            'payload': {
-                                'content': '2',
-                            },
+                            'url': 'http://test',
                         }]
-                    }]
+                    }, {
+                        'title': 'hello again',
+                        'image_url': 'http://image',
+                        'buttons': [{
+                            'title': 'Mercury',
+                            'payload': {
+                                'content': '1',
+                            },
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Venus',
+                            'url': 'http://test',
+                        }]
+                    }
+                    ]
                 }
             })
 
@@ -409,15 +442,24 @@ class TestMessengerTransport(VumiTestCase):
                                 'buttons': [{
                                     'type': 'postback',
                                     'title': 'Jupiter',
-                                    'payload': json.dumps({
-                                        'content': '1',
-                                    }),
+                                    'payload': '{"content":"1"}',
                                 }, {
-                                    'type': 'postback',
+                                    'type': 'web_url',
                                     'title': 'Mars',
-                                    'payload': json.dumps({
-                                        'content': '2',
-                                    }),
+                                    'url': 'http://test',
+                                }]
+                            }, {
+                                'title': 'hello again',
+                                'subtitle': None,
+                                'image_url': 'http://image',
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Mercury',
+                                    'payload': '{"content":"1"}',
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Venus',
+                                    'url': 'http://test',
                                 }]
                             }]
                         }
