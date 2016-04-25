@@ -137,11 +137,16 @@ limits appy.
                 'template_type': 'button'
                 'text': 'The accompanying text with the button',
                 'buttons': [{
+                    'type': 'postback', # defaults to postback if not specified
                     'title': 'Button 1',
                     'payload': {
                         'content': 'The content expected when a button is pressed',
                         'in_reply_to': 'The ID of the previous message' # This can be left blank
                     }
+                }, {
+                    'type': 'web_url',
+                    'title': 'Button 2',
+                    'url': 'http://some.url'
                 }]
             }
         })
@@ -161,14 +166,19 @@ limits appy.
                 'template_type': 'generic'
                 'elements': [
                     'title': 'The title',
-                    'subtitle': 'The subtitle',
+                    'subtitle': 'The subtitle', # This can be left blank
                     'image_url': 'The image_url to use', # This can be left blank
                     'buttons': [{
+                        'type': 'postback', # defaults to postback if not specified
                         'title': 'Button 1',
                         'payload': {
                             'content': 'The content expected when a button is pressed',
                             'in_reply_to': 'The ID of the previous message' # This can be left blank
                         }
+                    }, {
+                        'type': 'web_url',
+                        'title': 'Button 2',
+                        'url': 'http://some.url'
                     }]
                 ]
             }
