@@ -50,13 +50,14 @@ class Page(object):
         self.timestamp = timestamp
 
     def __str__(self):
-        return ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, content: %s, "
-         "mid: %s, timestamp: %s>") % (self.to_addr,
-                                       self.from_addr,
-                                       self.in_reply_to,
-                                       self.content,
-                                       self.mid,
-                                       self.timestamp)
+        return ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, "
+                "content: %s, mid: %s, timestamp: %s>") % (
+            self.to_addr,
+            self.from_addr,
+            self.in_reply_to,
+            self.content,
+            self.mid,
+            self.timestamp)
 
     @classmethod
     def from_fp(cls, fp):
