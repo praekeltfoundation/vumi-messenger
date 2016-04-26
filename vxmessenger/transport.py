@@ -70,6 +70,7 @@ class Page(object):
             raise UnsupportedMessage('Unable to parse message: %s' % (e,))
 
         messages = []
+        errors = []
 
         for entry in data.get('entry', []):
             for msg in entry.get('messaging', []):
@@ -82,14 +83,14 @@ class Page(object):
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
                 elif ('message' in msg) and ('attachments' in msg['message']):
-                    raise UnsupportedMessage(
-                        'Not supporting attachments yet: %s.' % (data,))
+                    errors.append('Not supporting attachments yet: %s.'
+                                 % (msg,))
                 elif 'optin' in msg:
-                    raise UnsupportedMessage(
-                        'Not supporting optin messages yet: %s.' % (data,))
+                    errors.append('Not supporting optin messages yet: %s.'
+                                 % (msg,))
                 elif 'delivery' in msg:
-                    raise UnsupportedMessage(
-                        'Not supporting delivery messages yet: %s.' % (data,))
+                    errors.append('Not supporting delivery messages yet: %s.'
+                                 % (msg,))
                 elif 'postback' in msg:
                     payload = json.loads(msg['postback']['payload'])
                     messages.append(cls(
@@ -101,9 +102,8 @@ class Page(object):
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
                 else:
-                    raise UnsupportedMessage(
-                        'Not supporting %r.: %s.' % (data,))
-        return messages
+                    errors.append('Not supporting: %s' % (msg,))
+        return messages, errors
 
 
 class MessengerTransportException(Exception):
@@ -191,14 +191,18 @@ class MessengerTransport(HttpRpcTransport):
             return
 
         try:
-            pages = Page.from_fp(request.content)
-            self.log.info("MessengerTransport inbound %r" % (pages,))
+            pages, errors = Page.from_fp(request.content)
         except (UnsupportedMessage,), e:
             self.respond(message_id, http.OK, {
                 'warning': 'Accepted unsuppported message: %s' % (e,)
             })
             self.log.error(e)
             return
+
+        self.log.info("MessengerTransport inbound %r" % (pages,))
+        if errors:
+            for error in errors:
+                self.log.error(error)
 
         for page in pages:
             if self.config.get('retrieve_profile'):
