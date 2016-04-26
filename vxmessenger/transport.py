@@ -84,13 +84,13 @@ class Page(object):
                     ))
                 elif ('message' in msg) and ('attachments' in msg['message']):
                     errors.append('Not supporting attachments yet: %s.'
-                                 % (msg,))
+                                  % (msg,))
                 elif 'optin' in msg:
                     errors.append('Not supporting optin messages yet: %s.'
-                                 % (msg,))
+                                  % (msg,))
                 elif 'delivery' in msg:
                     errors.append('Not supporting delivery messages yet: %s.'
-                                 % (msg,))
+                                  % (msg,))
                 elif 'postback' in msg:
                     payload = json.loads(msg['postback']['payload'])
                     messages.append(cls(
