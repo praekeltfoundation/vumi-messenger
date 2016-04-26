@@ -192,6 +192,7 @@ class MessengerTransport(HttpRpcTransport):
 
         try:
             pages = Page.from_fp(request.content)
+            self.log.info("MessengerTransport inbound %r" % (pages,))
         except (UnsupportedMessage,), e:
             self.respond(message_id, http.OK, {
                 'warning': 'Accepted unsuppported message: %s' % (e,)
@@ -200,8 +201,6 @@ class MessengerTransport(HttpRpcTransport):
             return
 
         for page in pages:
-            self.log.info("MessengerTransport inbound %r" % (page,))
-
             if self.config.get('retrieve_profile'):
                 helper_metadata = yield self.get_user_profile(page.from_addr)
             else:
