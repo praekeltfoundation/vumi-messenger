@@ -152,7 +152,7 @@ limits appy.
         })
 
 A Generic Reply
-~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~
 
 Please be aware of the limitations_ that Facebook applies to these messages.
 A call to action may only have a maximum of 3 buttons, 10 elements, and character count

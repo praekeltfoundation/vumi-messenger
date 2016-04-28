@@ -10,13 +10,16 @@ env:
   - TZ=UTC,DJANGO_SETTINGS_MODULE=vxmessenger.webapp
 
 install:
+  - pip install 'pip>=8.1.1'
   - pip install coveralls
   - pip install wheel
+  - pip install docutils
   - pip install -r requirements-dev.txt
   - pip install -e .
 
 script:
   - flake8
+  - python setup.py check --restructuredtext --strict
   - py.test --ds=vxmessenger.webapp.settings --cov=vxmessenger --cov-report=term
 
 after_success:
