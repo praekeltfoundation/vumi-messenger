@@ -270,10 +270,10 @@ class TestMessengerTransport(VumiTestCase):
                         "message": {
                             "mid": "mid.1457764197618:41d102a3e1ae206a37",
                             "seq": 63,
-                            "attachments":[{
-                                "type":"image",
+                            "attachments": [{
+                                "type": "image",
                                 "payload": {
-                                    "url":"IMAGE_URL"
+                                    "url": "IMAGE_URL"
                                 }
                             }]
                         }
@@ -293,10 +293,10 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(msg['transport_metadata'], {
             'messenger': {
                 'mid': "mid.1457764197618:41d102a3e1ae206a37",
-                "attachments":[{
-                    "type":"image",
+                "attachments": [{
+                    "type": "image",
                     "payload": {
-                        "url":"IMAGE_URL"
+                        "url": "IMAGE_URL"
                     }
                 }]
             }
