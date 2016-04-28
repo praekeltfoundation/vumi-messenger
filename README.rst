@@ -136,12 +136,17 @@ limits appy.
             'messenger': {
                 'template_type': 'button'
                 'text': 'The accompanying text with the button',
-                'buttons': [{
+                'buttons': [{ # Up to 3 buttons
+                    'type': 'postback', # defaults to postback if not specified
                     'title': 'Button 1',
                     'payload': {
                         'content': 'The content expected when a button is pressed',
                         'in_reply_to': 'The ID of the previous message' # This can be left blank
                     }
+                }, {
+                    'type': 'web_url',
+                    'title': 'Button 2',
+                    'url': 'http://some.url'
                 }]
             }
         })
@@ -150,7 +155,7 @@ A Generic Reply
 ~~~~~~~~~~~~~~
 
 Please be aware of the limitations_ that Facebook applies to these messages.
-A call to action may only have a maximum of 3 buttons and character count
+A call to action may only have a maximum of 3 buttons, 10 elements, and character count
 limits appy.
 
 .. code-block:: python
@@ -159,18 +164,23 @@ limits appy.
         helper_metadata={
             'messenger': {
                 'template_type': 'generic'
-                'elements': [
+                'elements': [{ # Up to 10 elements
                     'title': 'The title',
-                    'subtitle': 'The subtitle',
+                    'subtitle': 'The subtitle', # This can be left blank
                     'image_url': 'The image_url to use', # This can be left blank
-                    'buttons': [{
+                    'buttons': [{ # Up to 3 buttons
+                        'type': 'postback', # defaults to postback if not specified
                         'title': 'Button 1',
                         'payload': {
                             'content': 'The content expected when a button is pressed',
                             'in_reply_to': 'The ID of the previous message' # This can be left blank
                         }
+                    }, {
+                        'type': 'web_url',
+                        'title': 'Button 2',
+                        'url': 'http://some.url'
                     }]
-                ]
+                }]
             }
         })
 
