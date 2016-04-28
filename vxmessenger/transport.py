@@ -61,42 +61,50 @@ class Page(object):
 
     @classmethod
     def from_fp(cls, fp):
+
+        def fb_timestamp(timestamp):
+            return datetime.fromtimestamp(timestamp / 1000)
+
         try:
             data = json.load(fp)
-            [entry] = data['entry']
-            [msg] = entry['messaging']
         except (ValueError, KeyError), e:
             raise UnsupportedMessage('Unable to parse message: %s' % (e,))
 
-        if ('message' in msg) and ('text' in msg['message']):
-            return cls(
-                to_addr=msg['recipient']['id'],
-                from_addr=msg['sender']['id'],
-                mid=msg['message']['mid'],
-                content=msg['message']['text'],
-                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000))
-        elif ('message' in msg) and ('attachments' in msg['message']):
-            raise UnsupportedMessage(
-                'Not supporting attachments yet: %s.' % (data,))
-        elif 'optin' in msg:
-            raise UnsupportedMessage(
-                'Not supporting optin messages yet: %s.' % (data,))
-        elif 'delivery' in msg:
-            raise UnsupportedMessage(
-                'Not supporting delivery messages yet: %s.' % (data,))
-        elif 'postback' in msg:
-            payload = json.loads(msg['postback']['payload'])
-            return cls(
-                to_addr=msg['recipient']['id'],
-                from_addr=msg['sender']['id'],
-                mid=None,
-                content=payload['content'],
-                in_reply_to=payload.get('in_reply_to'),
-                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000)
-            )
-        else:
-            raise UnsupportedMessage(
-                'Not supporting %r.: %s.' % (data,))
+        messages = []
+        errors = []
+
+        for entry in data.get('entry', []):
+            for msg in entry.get('messaging', []):
+                if ('message' in msg) and ('text' in msg['message']):
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=msg['message']['mid'],
+                        content=msg['message']['text'],
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                elif ('message' in msg) and ('attachments' in msg['message']):
+                    errors.append('Not supporting attachments yet: %s.'
+                                  % (msg,))
+                elif 'optin' in msg:
+                    errors.append('Not supporting optin messages yet: %s.'
+                                  % (msg,))
+                elif 'delivery' in msg:
+                    errors.append('Not supporting delivery messages yet: %s.'
+                                  % (msg,))
+                elif 'postback' in msg:
+                    payload = json.loads(msg['postback']['payload'])
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content=payload['content'],
+                        in_reply_to=payload.get('in_reply_to'),
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                else:
+                    errors.append('Not supporting: %s' % (msg,))
+        return messages, errors
 
 
 class MessengerTransportException(Exception):
@@ -184,8 +192,7 @@ class MessengerTransport(HttpRpcTransport):
             return
 
         try:
-            page = Page.from_fp(request.content)
-            self.log.info("MessengerTransport inbound %r" % (page,))
+            pages, errors = Page.from_fp(request.content)
         except (UnsupportedMessage,), e:
             self.respond(message_id, http.OK, {
                 'warning': 'Accepted unsuppported message: %s' % (e,)
@@ -193,36 +200,41 @@ class MessengerTransport(HttpRpcTransport):
             self.log.error(e)
             return
 
-        if self.config.get('retrieve_profile'):
-            helper_metadata = yield self.get_user_profile(page.from_addr)
-        else:
-            helper_metadata = {}
+        self.log.info("MessengerTransport inbound %r" % (pages,))
+        for error in errors:
+            self.log.error(error)
 
-        yield self.publish_message(
-            message_id=message_id,
-            from_addr=page.from_addr,
-            from_addr_type='facebook_messenger',
-            to_addr=page.to_addr,
-            in_reply_to=page.in_reply_to,
-            content=page.content,
-            provider='facebook',
-            transport_type=self.transport_type,
-            transport_metadata={
-                'messenger': {
-                    'mid': page.mid,
-                }
-            },
-            helper_metadata={
-                'messenger': helper_metadata
-            })
+        for page in pages:
+            if self.config.get('retrieve_profile'):
+                helper_metadata = yield self.get_user_profile(page.from_addr)
+            else:
+                helper_metadata = {}
 
-        self.respond(message_id, http.OK, {})
+            yield self.publish_message(
+                message_id=message_id,
+                from_addr=page.from_addr,
+                from_addr_type='facebook_messenger',
+                to_addr=page.to_addr,
+                in_reply_to=page.in_reply_to,
+                content=page.content,
+                provider='facebook',
+                transport_type=self.transport_type,
+                transport_metadata={
+                    'messenger': {
+                        'mid': page.mid,
+                    }
+                },
+                helper_metadata={
+                    'messenger': helper_metadata
+                })
 
-        yield self.add_status(
-            component='inbound',
-            status='ok',
-            type='request_success',
-            message='Request successful')
+            self.respond(message_id, http.OK, {})
+
+            yield self.add_status(
+                component='inbound',
+                status='ok',
+                type='request_success',
+                message='Request successful')
 
     @inlineCallbacks
     def get_user_profile(self, user_id):
