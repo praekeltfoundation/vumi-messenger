@@ -200,9 +200,8 @@ class MessengerTransport(HttpRpcTransport):
             return
 
         self.log.info("MessengerTransport inbound %r" % (pages,))
-        if errors:
-            for error in errors:
-                self.log.error(error)
+        for error in errors:
+            self.log.error(error)
 
         for page in pages:
             if self.config.get('retrieve_profile'):
