@@ -86,6 +86,7 @@ If you've used a different ``web_port`` and ``web_path`` parameter you'll need t
     ``/jb/`` endpoint, all other transports are made available from the root path.
     For the example above the endpoint would be ``/api`` on port 80.
 
+
 Hook up an Application to your Messenger integration
 ====================================================
 
@@ -140,8 +141,12 @@ limits appy.
                     'type': 'postback', # defaults to postback if not specified
                     'title': 'Button 1',
                     'payload': {
-                        'content': 'The content expected when a button is pressed',
-                        'in_reply_to': 'The ID of the previous message' # This can be left blank
+                        # In here you can put whatever you want to
+                        # 'content' and 'in_reply_to' will go into the standard vumi message
+                        'content': 'The content expected when a button is pressed', # This can be left blank
+                        'in_reply_to': 'The ID of the previous message', # This can be left blank
+                        # Anything else will end up in transport_metadata.messenger
+                        'anything_extra': 'Bonus!'
                     }
                 }, {
                     'type': 'web_url',
@@ -172,8 +177,12 @@ limits appy.
                         'type': 'postback', # defaults to postback if not specified
                         'title': 'Button 1',
                         'payload': {
-                            'content': 'The content expected when a button is pressed',
-                            'in_reply_to': 'The ID of the previous message' # This can be left blank
+                            # In here you can put whatever you want to
+                            # 'content' and 'in_reply_to' will go into the standard vumi message
+                            'content': 'The content expected when a button is pressed', # This can be left blank
+                            'in_reply_to': 'The ID of the previous message', # This can be left blank
+                            # Anything else will end up in transport_metadata.messenger
+                            'anything_extra': 'Bonus!'
                         }
                     }, {
                         'type': 'web_url',
@@ -183,6 +192,66 @@ limits appy.
                 }]
             }
         })
+
+
+Message format
+==============
+
+Due to some extra features of the messenger platform, there is some extra data that you may need to pay attention to:
+
+**transport_metadata:**
+
+Contains a dict ``messenger`` with the following keys:
+
+``mid``:
+    Messenger message id.
+    
+ ``attachments``:
+    List containing dictionaries as such:
+    
+    .. code-block:: json
+    
+        {
+            "type":"image",
+            "payload": {
+                "url":"IMAGE_URL"
+            }
+        }
+
+``optin``:
+    Dict containing a ``ref`` key, which is the PASS_THROUGH_PARAM as defined by:
+
+    https://developers.facebook.com/docs/messenger-platform/plugin-reference#send_to_messenger
+ 
+Other items defined in ``payload``:
+    e.g. ``"anything_extra": "Bonus"``
+
+**helper_metadata:**
+
+Contains a dict ``messenger`` with the user profile as such:
+
+Note: only if ``retrieve_profile`` is configured as ``true``
+
+.. code-block:: json
+    
+    {
+        "first_name": "Firstname",
+        "last_name": "Lastname",
+        "profile_pic": "IMAGE_URL"
+    }
+
+Supported webhooks
+~~~~~~~~~~~~~~~~~~
+
+``messages``:
+    Standard conversational messages & attachments.
+    
+``messaging_postbacks``:
+    Postback buttons.
+
+``messaging_optins``:
+    Send-to-Messenger / authentication callback.
+
 
 .. _Junebug: http://junebug.readthedocs.org
 .. _limitations: https://developers.facebook.com/docs/messenger-platform/send-api-reference#guidelines

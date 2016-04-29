@@ -249,6 +249,104 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(inbound_status['message'], 'Request successful')
 
     @inlineCallbacks
+    def test_inbound_attachments(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "message": {
+                            "mid": "mid.1457764197618:41d102a3e1ae206a37",
+                            "seq": 63,
+                            "attachments": [{
+                                "type": "image",
+                                "payload": {
+                                    "url": "IMAGE_URL"
+                                }
+                            }]
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': "mid.1457764197618:41d102a3e1ae206a37",
+                "attachments": [{
+                    "type": "image",
+                    "payload": {
+                        "url": "IMAGE_URL"
+                    }
+                }]
+            }
+        })
+
+    @inlineCallbacks
+    def test_inbound_optin(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "optin": {
+                            "ref": "PASS_THROUGH_PARAM"
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                "optin": {
+                    "ref": "PASS_THROUGH_PARAM"
+                }
+            }
+        })
+
+    @inlineCallbacks
     def test_inbound_postback(self):
         yield self.mk_transport()
 
@@ -281,8 +379,62 @@ class TestMessengerTransport(VumiTestCase):
 
         [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
 
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
         self.assertEqual(msg['content'], '1')
         self.assertEqual(msg['in_reply_to'], '12345')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None
+            }
+        })
+
+    @inlineCallbacks
+    def test_inbound_postback_other(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "postback": {
+                            "payload": json.dumps({
+                                "postback": "ocean"
+                            })
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['in_reply_to'], None)
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                "postback": "ocean"
+            }
+        })
 
     @inlineCallbacks
     def test_inbound_with_user_profile(self):

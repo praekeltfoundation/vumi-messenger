@@ -41,23 +41,26 @@ class Page(object):
     """A thing that parses "Page" objects as received from Messenger"""
 
     def __init__(self, to_addr, from_addr,
-                 mid, content, timestamp, in_reply_to=None):
+                 mid, content, timestamp, in_reply_to=None, extra=None):
         self.to_addr = to_addr
         self.from_addr = from_addr
         self.in_reply_to = in_reply_to
         self.mid = mid
         self.content = content
         self.timestamp = timestamp
+        self.extra = extra if extra else {}
 
     def __str__(self):
         return ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, "
-                "content: %s, mid: %s, timestamp: %s>") % (
+                "content: %s, mid: %s, timestamp: %s, extra: %s>") % (
             self.to_addr,
             self.from_addr,
             self.in_reply_to,
             self.content,
             self.mid,
-            self.timestamp)
+            self.timestamp,
+            json.dumps(self.extra)
+        )
 
     @classmethod
     def from_fp(cls, fp):
@@ -84,22 +87,45 @@ class Page(object):
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
                 elif ('message' in msg) and ('attachments' in msg['message']):
-                    errors.append('Not supporting attachments yet: %s.'
-                                  % (msg,))
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=msg['message']['mid'],
+                        content='',
+                        extra={'attachments': msg['message']['attachments']},
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
                 elif 'optin' in msg:
-                    errors.append('Not supporting optin messages yet: %s.'
-                                  % (msg,))
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content='',
+                        extra={'optin': msg['optin']},
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
                 elif 'delivery' in msg:
                     errors.append('Not supporting delivery messages yet: %s.'
                                   % (msg,))
                 elif 'postback' in msg:
                     payload = json.loads(msg['postback']['payload'])
+                    content = payload.get('content', '')
+                    in_reply_to = payload.get('in_reply_to')
+                    try:
+                        del payload['content']
+                    except KeyError:
+                        pass
+                    try:
+                        del payload['in_reply_to']
+                    except KeyError:
+                        pass
                     messages.append(cls(
                         to_addr=msg['recipient']['id'],
                         from_addr=msg['sender']['id'],
                         mid=None,
-                        content=payload['content'],
-                        in_reply_to=payload.get('in_reply_to'),
+                        content=content,
+                        in_reply_to=in_reply_to,
+                        extra=payload,
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
                 else:
@@ -200,7 +226,8 @@ class MessengerTransport(HttpRpcTransport):
             self.log.error(e)
             return
 
-        self.log.info("MessengerTransport inbound %r" % (pages,))
+        if pages:
+            self.log.info("MessengerTransport inbound %r" % (pages,))
         for error in errors:
             self.log.error(error)
 
@@ -220,21 +247,19 @@ class MessengerTransport(HttpRpcTransport):
                 provider='facebook',
                 transport_type=self.transport_type,
                 transport_metadata={
-                    'messenger': {
-                        'mid': page.mid,
-                    }
+                    'messenger': dict(page.extra, mid=page.mid)
                 },
                 helper_metadata={
                     'messenger': helper_metadata
                 })
 
-            self.respond(message_id, http.OK, {})
+        self.respond(message_id, http.OK, {})
 
-            yield self.add_status(
-                component='inbound',
-                status='ok',
-                type='request_success',
-                message='Request successful')
+        yield self.add_status(
+            component='inbound',
+            status='ok',
+            type='request_success',
+            message='Request successful')
 
     @inlineCallbacks
     def get_user_profile(self, user_id):
