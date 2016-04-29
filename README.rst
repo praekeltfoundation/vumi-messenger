@@ -206,7 +206,7 @@ Contains a dict ``messenger`` with the following keys:
 ``mid``:
     Messenger message id.
     
- ``attachments``:
+``attachments``:
     List containing dictionaries as such:
     
     .. code-block:: json
