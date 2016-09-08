@@ -52,12 +52,7 @@ save it as a file called ``config.json``:
         "web_port": 8051,
         "noisy": true,
         "page_id": "YOUR_FB_PAGE_ID",
-        "retrieve_profile": true,
-        "welcome_message": [{
-          "message": {
-            "text": "Hi :) Welcome to our Messenger Bot!"
-          }
-        }],
+        "retrieve_profile": false,
         "outbound_url": "https://graph.facebook.com/v2.6/me/messages",
         "access_token": "YOUR_FB_ACCESS_TOKEN"
       }
@@ -145,13 +140,17 @@ limits appy.
                         # 'content' and 'in_reply_to' will go into the standard vumi message
                         'content': 'The content expected when a button is pressed', # This can be left blank
                         'in_reply_to': 'The ID of the previous message', # This can be left blank
-                        # Anything else will end up in transport_metadata.messenger
+                        # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                         'anything_extra': 'Bonus!'
                     }
                 }, {
                     'type': 'web_url',
                     'title': 'Button 2',
                     'url': 'http://some.url'
+                }, {
+                    'type': 'phone_number',
+                    'title': 'Button 3',
+                    'url': '+271234567'
                 }]
             }
         })
@@ -181,13 +180,17 @@ limits appy.
                             # 'content' and 'in_reply_to' will go into the standard vumi message
                             'content': 'The content expected when a button is pressed', # This can be left blank
                             'in_reply_to': 'The ID of the previous message', # This can be left blank
-                            # Anything else will end up in transport_metadata.messenger
+                            # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                             'anything_extra': 'Bonus!'
                         }
                     }, {
                         'type': 'web_url',
                         'title': 'Button 2',
                         'url': 'http://some.url'
+                    }, {
+                        'type': 'phone_number',
+                        'title': 'Button 3',
+                        'url': '+271234567'
                     }]
                 }]
             }
@@ -228,7 +231,7 @@ Other items defined in ``payload``:
 
 **helper_metadata:**
 
-Contains a dict ``messenger`` with the user profile as such:
+Contains a dict ``messenger`` with the same data as ``transport_metadata`` and the user profile as such:
 
 Note: only if ``retrieve_profile`` is configured as ``true``
 

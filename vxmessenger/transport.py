@@ -236,6 +236,8 @@ class MessengerTransport(HttpRpcTransport):
                 helper_metadata = yield self.get_user_profile(page.from_addr)
             else:
                 helper_metadata = {}
+            transport_metadata = dict(page.extra, mid=page.mid)
+            helper_metadata.update(transport_metadata)
 
             yield self.publish_message(
                 message_id=message_id,
@@ -247,7 +249,7 @@ class MessengerTransport(HttpRpcTransport):
                 provider='facebook',
                 transport_type=self.transport_type,
                 transport_metadata={
-                    'messenger': dict(page.extra, mid=page.mid)
+                    'messenger': transport_metadata
                 },
                 helper_metadata={
                     'messenger': helper_metadata
@@ -300,6 +302,8 @@ class MessengerTransport(HttpRpcTransport):
             ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
         elif typ == 'web_url':
             ret['url'] = btn['url']
+        elif typ == 'phone_number':
+            ret['payload'] = btn['payload']
         else:
             raise UnsupportedMessage('Unknown button type "%s"' % typ)
         return ret
