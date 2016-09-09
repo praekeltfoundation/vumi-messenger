@@ -204,7 +204,9 @@ class MessengerTransport(HttpRpcTransport):
         if body is None:
             body = {}
 
-        self.finish_request(message_id, json.dumps(body, separators=(',', ':')), code=code)
+        self.finish_request(message_id,
+                            json.dumps(body, separators=(',', ':')),
+                            code=code)
 
     def request(self, method, url, data, **kwargs):
         return treq.request(method=method, url=url, data=data, **kwargs)
