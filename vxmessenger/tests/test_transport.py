@@ -672,6 +672,7 @@ class TestMessengerTransport(VumiTestCase):
                                 'title': 'hello world',
                                 'subtitle': 'arf',
                                 'image_url': None,
+                                'item_url': None,
                                 'buttons': [{
                                     'type': 'postback',
                                     'title': 'Jupiter',
@@ -685,6 +686,7 @@ class TestMessengerTransport(VumiTestCase):
                                 'title': 'hello again',
                                 'subtitle': None,
                                 'image_url': 'http://image',
+                                'item_url': None,
                                 'buttons': [{
                                     'type': 'postback',
                                     'title': 'Mercury',

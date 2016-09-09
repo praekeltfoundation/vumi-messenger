@@ -342,6 +342,7 @@ class MessengerTransport(HttpRpcTransport):
                             'title': element['title'],
                             'subtitle': element.get('subtitle'),
                             'image_url': element.get('image_url'),
+                            'item_url': element.get('item_url'),
                             'buttons': [self.construct_button(btn)
                                         for btn in element['buttons']]
                         } for element in button['elements']]
