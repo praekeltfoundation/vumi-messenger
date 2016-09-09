@@ -189,7 +189,7 @@ class MessengerTransport(HttpRpcTransport):
                 'setting_type': 'call_to_actions',
                 'thread_state': 'new_thread',
                 'call_to_actions': welcome_message_payload
-            }),
+            }, separators=(',', ':')),
             headers={
                 'Content-Type': ['application/json']
             })
@@ -204,7 +204,7 @@ class MessengerTransport(HttpRpcTransport):
         if body is None:
             body = {}
 
-        self.finish_request(message_id, json.dumps(body), code=code)
+        self.finish_request(message_id, json.dumps(body, separators=(',', ':')), code=code)
 
     def request(self, method, url, data, **kwargs):
         return treq.request(method=method, url=url, data=data, **kwargs)
@@ -327,6 +327,21 @@ class MessengerTransport(HttpRpcTransport):
             }
         }
 
+    def construct_element(self, element):
+        ret = {
+            'title': element['title'],
+        }
+        if element.get('subtitle'):
+            ret['subtitle'] = element['subtitle']
+        if element.get('image_url'):
+            ret['image_url'] = element['image_url']
+        if element.get('item_url'):
+            ret['item_url'] = element['item_url']
+        buttons = [self.construct_button(btn) for btn in element['buttons']]
+        if buttons:
+            ret['buttons'] = buttons
+        return ret
+
     def construct_generic_reply(self, message):
         button = message['helper_metadata']['messenger']
         return {
@@ -338,14 +353,8 @@ class MessengerTransport(HttpRpcTransport):
                     'type': 'template',
                     'payload': {
                         'template_type': 'generic',
-                        'elements': [{
-                            'title': element['title'],
-                            'subtitle': element.get('subtitle'),
-                            'image_url': element.get('image_url'),
-                            'item_url': element.get('item_url'),
-                            'buttons': [self.construct_button(btn)
-                                        for btn in element['buttons']]
-                        } for element in button['elements']]
+                        'elements': [self.construct_element(element)
+                                     for element in button['elements']]
                     }
                 }
             }
@@ -371,7 +380,7 @@ class MessengerTransport(HttpRpcTransport):
                 method='POST',
                 url='%s?access_token=%s' % (self.config['outbound_url'],
                                             self.config['access_token']),
-                data=json.dumps(reply),
+                data=json.dumps(reply, separators=(',', ':')),
                 headers={
                     'Content-Type': 'application/json',
                 },
