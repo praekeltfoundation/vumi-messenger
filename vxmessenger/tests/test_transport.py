@@ -483,6 +483,7 @@ class TestMessengerTransport(VumiTestCase):
 
         self.assertEqual(msg['helper_metadata'], {
             'messenger': {
+                'mid': 'mid.1457764197618:41d102a3e1ae206a38',
                 'first_name': 'first-name',
                 'last_name': 'last-name',
                 'profile_pic': 'rather unpleasant'
