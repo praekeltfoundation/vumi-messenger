@@ -10,7 +10,7 @@ from twisted.internet.task import Clock
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vxmessenger.transport import MessengerTransport
+from vxmessenger.transport import MessengerTransport, UnsupportedMessage
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
 from vumi.tests.helpers import MessageHelper
 
@@ -169,6 +169,184 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(inbound_status['message'], 'Request successful')
 
     @inlineCallbacks
+    def test_inbound_multiple(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID1"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "message": {
+                            "mid": "mid.1457764197618:41d102a3e1ae206a38",
+                            "seq": 73,
+                            "text": "hello, world!"
+                        }
+                    }, {
+                        "sender": {
+                            "id": "USER_ID2"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "message": {
+                            "mid": "mid.1457764197618:41d102a3e1ae206a39",
+                            "seq": 74,
+                            "text": "hello, again!"
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg1, msg2] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg1['from_addr'], 'USER_ID1')
+        self.assertEqual(msg1['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg1['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg1['content'], 'hello, world!')
+        self.assertEqual(msg1['provider'], 'facebook')
+        self.assertEqual(msg1['transport_metadata'], {
+            'messenger': {
+                'mid': 'mid.1457764197618:41d102a3e1ae206a38'
+            }
+        })
+
+        self.assertEqual(msg2['from_addr'], 'USER_ID2')
+        self.assertEqual(msg2['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg2['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg2['content'], 'hello, again!')
+        self.assertEqual(msg2['provider'], 'facebook')
+        self.assertEqual(msg2['transport_metadata'], {
+            'messenger': {
+                'mid': 'mid.1457764197618:41d102a3e1ae206a39'
+            }
+        })
+
+        statuses = self.tx_helper.get_dispatched_statuses()
+        [response_status, inbound_status] = statuses
+
+        self.assertEqual(response_status['status'], 'ok')
+        self.assertEqual(response_status['component'], 'response')
+        self.assertEqual(response_status['type'], 'response_sent')
+        self.assertEqual(response_status['message'], 'Response sent')
+
+        self.assertEqual(inbound_status['status'], 'ok')
+        self.assertEqual(inbound_status['component'], 'inbound')
+        self.assertEqual(inbound_status['type'], 'request_success')
+        self.assertEqual(inbound_status['message'], 'Request successful')
+
+    @inlineCallbacks
+    def test_inbound_attachments(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "message": {
+                            "mid": "mid.1457764197618:41d102a3e1ae206a37",
+                            "seq": 63,
+                            "attachments": [{
+                                "type": "image",
+                                "payload": {
+                                    "url": "IMAGE_URL"
+                                }
+                            }]
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': "mid.1457764197618:41d102a3e1ae206a37",
+                "attachments": [{
+                    "type": "image",
+                    "payload": {
+                        "url": "IMAGE_URL"
+                    }
+                }]
+            }
+        })
+
+    @inlineCallbacks
+    def test_inbound_optin(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "optin": {
+                            "ref": "PASS_THROUGH_PARAM"
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                "optin": {
+                    "ref": "PASS_THROUGH_PARAM"
+                }
+            }
+        })
+
+    @inlineCallbacks
     def test_inbound_postback(self):
         yield self.mk_transport()
 
@@ -201,8 +379,62 @@ class TestMessengerTransport(VumiTestCase):
 
         [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
 
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
         self.assertEqual(msg['content'], '1')
         self.assertEqual(msg['in_reply_to'], '12345')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None
+            }
+        })
+
+    @inlineCallbacks
+    def test_inbound_postback_other(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                "object": "page",
+                "entry": [{
+                    "id": "PAGE_ID",
+                    "time": 1457764198246,
+                    "messaging": [{
+                        "sender": {
+                            "id": "USER_ID"
+                        },
+                        "recipient": {
+                            "id": "PAGE_ID"
+                        },
+                        "timestamp": 1457764197627,
+                        "postback": {
+                            "payload": json.dumps({
+                                "postback": "ocean"
+                            })
+                        }
+                    }]
+                }]
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['in_reply_to'], None)
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                "postback": "ocean"
+            }
+        })
 
     @inlineCallbacks
     def test_inbound_with_user_profile(self):
@@ -251,6 +483,7 @@ class TestMessengerTransport(VumiTestCase):
 
         self.assertEqual(msg['helper_metadata'], {
             'messenger': {
+                'mid': 'mid.1457764197618:41d102a3e1ae206a38',
                 'first_name': 'first-name',
                 'last_name': 'last-name',
                 'profile_pic': 'rather unpleasant'
@@ -323,15 +556,12 @@ class TestMessengerTransport(VumiTestCase):
                             'content': '1',
                         },
                     }, {
+                        'type': 'web_url',
                         'title': 'Mars',
-                        'payload': {
-                            'content': '2',
-                        },
+                        'url': 'http://test',
                     }]
                 }
             })
-
-        self.maxDiff = None
 
         self.assertEqual(
             transport.construct_button_reply(msg),
@@ -349,18 +579,124 @@ class TestMessengerTransport(VumiTestCase):
                                 {
                                     'type': 'postback',
                                     'title': 'Jupiter',
-                                    'payload': json.dumps({
-                                        'content': '1',
-                                    }),
+                                    'payload': '{"content":"1"}',
                                 },
                                 {
-                                    'type': 'postback',
+                                    'type': 'web_url',
                                     'title': 'Mars',
-                                    'payload': json.dumps({
-                                        'content': '2',
-                                    }),
+                                    'url': 'http://test',
                                 }
                             ]
+                        }
+                    }
+                }
+            })
+
+    @inlineCallbacks
+    def test_construct_bad_button(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'button',
+                    'text': 'hello world',
+                    'buttons': [{
+                        'title': 'Jupiter',
+                        'payload': {
+                            'content': '1',
+                        },
+                    }, {
+                        'type': 'unknown',
+                        'title': 'Mars',
+                    }]
+                }
+            })
+
+        with self.assertRaisesRegexp(
+                UnsupportedMessage,
+                'Unknown button type "unknown"'):
+            transport.construct_button_reply(msg)
+
+    @inlineCallbacks
+    def test_construct_generic_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'generic',
+                    'elements': [{
+                        'title': 'hello world',
+                        'subtitle': 'arf',
+                        'buttons': [{
+                            'title': 'Jupiter',
+                            'payload': {
+                                'content': '1',
+                            },
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Mars',
+                            'url': 'http://test',
+                        }]
+                    }, {
+                        'title': 'hello again',
+                        'image_url': 'http://image',
+                        'buttons': [{
+                            'title': 'Mercury',
+                            'payload': {
+                                'content': '1',
+                            },
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Venus',
+                            'url': 'http://test',
+                        }]
+                    }
+                    ]
+                }
+            })
+
+        self.maxDiff = None
+
+        self.assertEqual(
+            transport.construct_generic_reply(msg),
+            {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'attachment': {
+                        'type': 'template',
+                        'payload': {
+                            'template_type': 'generic',
+                            'elements': [{
+                                'title': 'hello world',
+                                'subtitle': 'arf',
+                                'image_url': None,
+                                'item_url': None,
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Jupiter',
+                                    'payload': '{"content":"1"}',
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Mars',
+                                    'url': 'http://test',
+                                }]
+                            }, {
+                                'title': 'hello again',
+                                'subtitle': None,
+                                'image_url': 'http://image',
+                                'item_url': None,
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Mercury',
+                                    'payload': '{"content":"1"}',
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Venus',
+                                    'url': 'http://test',
+                                }]
+                            }]
                         }
                     }
                 }

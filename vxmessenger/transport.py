@@ -4,6 +4,8 @@ from urllib import urlencode
 
 import treq
 
+
+from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.error import TimeoutError
@@ -19,12 +21,16 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
     access_token = ConfigText(
         "The access_token for the Messenger API",
         required=True)
+    page_id = ConfigText(
+        "The page id for the Messenger API",
+        required=False,
+        fallbacks=[SingleFieldFallback("app_id")])
     app_id = ConfigText(
-        "The app id for the Messenger API",
+        "DEPRECATED The page app id for the Messenger API",
         required=False)
     welcome_message = ConfigDict(
         ("The payload for setting up a welcome message. "
-         "Requires an app_id to be set"),
+         "Requires a page_id to be set"),
         required=False)
     retrieve_profile = ConfigBool(
         "Set to true to include the user profile details in "
@@ -35,61 +41,96 @@ class Page(object):
     """A thing that parses "Page" objects as received from Messenger"""
 
     def __init__(self, to_addr, from_addr,
-                 mid, content, timestamp, in_reply_to=None):
+                 mid, content, timestamp, in_reply_to=None, extra=None):
         self.to_addr = to_addr
         self.from_addr = from_addr
         self.in_reply_to = in_reply_to
         self.mid = mid
         self.content = content
         self.timestamp = timestamp
+        self.extra = extra if extra else {}
 
     def __str__(self):
-        ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, content: %s, "
-         "mid: %s, timestamp: %s>") % (self.to_addr,
-                                       self.from_addr,
-                                       self.in_reply_to,
-                                       self.content,
-                                       self.mid,
-                                       self.timestamp)
+        return ("<Page to_addr: %s, from_addr: %s, in_reply_to: %s, "
+                "content: %s, mid: %s, timestamp: %s, extra: %s>") % (
+            self.to_addr,
+            self.from_addr,
+            self.in_reply_to,
+            self.content,
+            self.mid,
+            self.timestamp,
+            json.dumps(self.extra)
+        )
 
     @classmethod
     def from_fp(cls, fp):
+
+        def fb_timestamp(timestamp):
+            return datetime.fromtimestamp(timestamp / 1000)
+
         try:
             data = json.load(fp)
-            [entry] = data['entry']
-            [msg] = entry['messaging']
         except (ValueError, KeyError), e:
             raise UnsupportedMessage('Unable to parse message: %s' % (e,))
 
-        if ('message' in msg) and ('text' in msg['message']):
-            return cls(
-                to_addr=msg['recipient']['id'],
-                from_addr=msg['sender']['id'],
-                mid=msg['message']['mid'],
-                content=msg['message']['text'],
-                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000))
-        elif ('message' in msg) and ('attachments' in msg['message']):
-            raise UnsupportedMessage(
-                'Not supporting attachments yet: %s.' % (data,))
-        elif 'optin' in msg:
-            raise UnsupportedMessage(
-                'Not supporting optin messages yet: %s.' % (data,))
-        elif 'delivery' in msg:
-            raise UnsupportedMessage(
-                'Not supporting delivery messages yet: %s.' % (data,))
-        elif 'postback' in msg:
-            payload = json.loads(msg['postback']['payload'])
-            return cls(
-                to_addr=msg['recipient']['id'],
-                from_addr=msg['sender']['id'],
-                mid=None,
-                content=payload['content'],
-                in_reply_to=payload.get('in_reply_to'),
-                timestamp=datetime.fromtimestamp(msg['timestamp'] / 1000)
-            )
-        else:
-            raise UnsupportedMessage(
-                'Not supporting %r.: %s.' % (data,))
+        messages = []
+        errors = []
+
+        for entry in data.get('entry', []):
+            for msg in entry.get('messaging', []):
+                if ('message' in msg) and ('text' in msg['message']):
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=msg['message']['mid'],
+                        content=msg['message']['text'],
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                elif ('message' in msg) and ('attachments' in msg['message']):
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=msg['message']['mid'],
+                        content='',
+                        extra={'attachments': msg['message']['attachments']},
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                elif 'optin' in msg:
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content='',
+                        extra={'optin': msg['optin']},
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                elif 'delivery' in msg:
+                    errors.append('Not supporting delivery messages yet: %s.'
+                                  % (msg,))
+                elif 'postback' in msg:
+                    payload = json.loads(msg['postback']['payload'])
+                    content = payload.get('content', '')
+                    in_reply_to = payload.get('in_reply_to')
+                    try:
+                        del payload['content']
+                    except KeyError:
+                        pass
+                    try:
+                        del payload['in_reply_to']
+                    except KeyError:
+                        pass
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content=content,
+                        in_reply_to=in_reply_to,
+                        extra=payload,
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
+                else:
+                    errors.append('Not supporting: %s' % (msg,))
+        return messages, errors
 
 
 class MessengerTransportException(Exception):
@@ -117,13 +158,13 @@ class MessengerTransport(HttpRpcTransport):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
         if self.config.get('welcome_message'):
-            if not self.config.get('app_id'):
-                self.log.error('app_id is required for welcome_message')
+            if not self.config.get('page_id'):
+                self.log.error('page_id is required for welcome_message')
                 return
             try:
                 data = yield self.setup_welcome_message(
                     self.config['welcome_message'],
-                    self.config['app_id'])
+                    self.config['page_id'])
                 self.log.info('Set welcome message: %s' % (data,))
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
@@ -136,11 +177,11 @@ class MessengerTransport(HttpRpcTransport):
                 self.request_gc.stop()
 
     @inlineCallbacks
-    def setup_welcome_message(self, welcome_message_payload, app_id):
+    def setup_welcome_message(self, welcome_message_payload, page_id):
         response = yield self.request(
             'POST',
-            "https://graph.facebook.com/v2.5/%s/thread_settings?%s" % (
-                app_id,
+            "https://graph.facebook.com/v2.6/%s/thread_settings?%s" % (
+                page_id,
                 urlencode({
                     'access_token': self.config['access_token'],
                 })),
@@ -177,8 +218,7 @@ class MessengerTransport(HttpRpcTransport):
             return
 
         try:
-            page = Page.from_fp(request.content)
-            self.log.info("MessengerTransport inbound %r" % (page,))
+            pages, errors = Page.from_fp(request.content)
         except (UnsupportedMessage,), e:
             self.respond(message_id, http.OK, {
                 'warning': 'Accepted unsuppported message: %s' % (e,)
@@ -186,28 +226,34 @@ class MessengerTransport(HttpRpcTransport):
             self.log.error(e)
             return
 
-        if self.config.get('retrieve_profile'):
-            helper_metadata = yield self.get_user_profile(page.from_addr)
-        else:
-            helper_metadata = {}
+        if pages:
+            self.log.info("MessengerTransport inbound %r" % (pages,))
+        for error in errors:
+            self.log.error(error)
 
-        yield self.publish_message(
-            message_id=message_id,
-            from_addr=page.from_addr,
-            from_addr_type='facebook_messenger',
-            to_addr=page.to_addr,
-            in_reply_to=page.in_reply_to,
-            content=page.content,
-            provider='facebook',
-            transport_type=self.transport_type,
-            transport_metadata={
-                'messenger': {
-                    'mid': page.mid,
-                }
-            },
-            helper_metadata={
-                'messenger': helper_metadata
-            })
+        for page in pages:
+            if self.config.get('retrieve_profile'):
+                helper_metadata = yield self.get_user_profile(page.from_addr)
+            else:
+                helper_metadata = {}
+            transport_metadata = dict(page.extra, mid=page.mid)
+            helper_metadata.update(transport_metadata)
+
+            yield self.publish_message(
+                message_id=message_id,
+                from_addr=page.from_addr,
+                from_addr_type='facebook_messenger',
+                to_addr=page.to_addr,
+                in_reply_to=page.in_reply_to,
+                content=page.content,
+                provider='facebook',
+                transport_type=self.transport_type,
+                transport_metadata={
+                    'messenger': transport_metadata
+                },
+                helper_metadata={
+                    'messenger': helper_metadata
+                })
 
         self.respond(message_id, http.OK, {})
 
@@ -221,7 +267,7 @@ class MessengerTransport(HttpRpcTransport):
     def get_user_profile(self, user_id):
         response = yield self.request(
             method='GET',
-            url='https://graph.facebook.com/v2.5/%s?%s' % (
+            url='https://graph.facebook.com/v2.6/%s?%s' % (
                 user_id, urlencode({
                     'fields': 'first_name,last_name,profile_pic',
                     'access_token': self.config['access_token'],
@@ -246,6 +292,22 @@ class MessengerTransport(HttpRpcTransport):
 
         return self.construct_plain_reply(message)
 
+    def construct_button(self, btn):
+        typ = btn.get('type', 'postback')
+        ret = {
+            'type': typ,
+            'title': btn['title'],
+        }
+        if typ == 'postback':
+            ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
+        elif typ == 'web_url':
+            ret['url'] = btn['url']
+        elif typ == 'phone_number':
+            ret['payload'] = btn['payload']
+        else:
+            raise UnsupportedMessage('Unknown button type "%s"' % typ)
+        return ret
+
     def construct_button_reply(self, message):
         button = message['helper_metadata']['messenger']
         return {
@@ -258,13 +320,8 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'button',
                         'text': button['text'],
-                        'buttons': [
-                            {
-                                'type': 'postback',
-                                'title': btn['title'],
-                                'payload': json.dumps(btn['payload']),
-                            } for btn in button['buttons']
-                        ]
+                        'buttons': [self.construct_button(btn)
+                                    for btn in button['buttons']]
                     }
                 }
             }
@@ -282,17 +339,13 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'generic',
                         'elements': [{
-                            'title': button['title'],
-                            'subtitle': button['subtitle'],
-                            'image_url': button.get('image_url'),
-                            'buttons': [
-                                {
-                                    'type': 'postback',
-                                    'title': btn['title'],
-                                    'payload': json.dumps(btn['payload']),
-                                } for btn in button['buttons']
-                            ]
-                        }]
+                            'title': element['title'],
+                            'subtitle': element.get('subtitle'),
+                            'image_url': element.get('image_url'),
+                            'item_url': element.get('item_url'),
+                            'buttons': [self.construct_button(btn)
+                                        for btn in element['buttons']]
+                        } for element in button['elements']]
                     }
                 }
             }

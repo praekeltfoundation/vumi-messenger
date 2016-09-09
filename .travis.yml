@@ -2,32 +2,34 @@ sudo: false
 language: python
 python:
   - "2.7"
-cache:
-  directories:
-    - $HOME/.pip-cache/
+cache: pip
 
 env:
   - TZ=UTC,DJANGO_SETTINGS_MODULE=vxmessenger.webapp
 
 install:
+  - pip install 'pip>=8.1.1'
   - pip install coveralls
   - pip install wheel
+  - pip install docutils
   - pip install -r requirements-dev.txt
   - pip install -e .
 
 script:
   - flake8
+  - python setup.py check --strict
+  - rst2html.py --halt=1 README.rst > /dev/null
   - py.test --ds=vxmessenger.webapp.settings --cov=vxmessenger --cov-report=term
 
 after_success:
   - coveralls
 
-# deploy:
-#   provider: pypi
-#   distributions: sdist bdist_wheel
-#   user: Praekelt
-#   password:
-#     secure: "generate with travis encrypt"
-#   on:
-#     tags: true
-#     all_branches: true
+deploy:
+  provider: pypi
+  distributions: sdist bdist_wheel
+  user: Praekelt
+  password:
+    secure: "DkwYgl3vDazVAMfll7jzXoB6dzshRBmeeAsvDb++FRTl/l8Go35TC61zj4RTZimMHNXOxwknxURvNYgtVBQdGjX4fXwSU/EXPIsQzslYBlF8BEi9LOjWHWREnnUMrcB8d4Hg1a3KfymEHYhrlNitL2rSWiYlyeUdl+cEgQdtfPOEET86apNwe9rDJiFmqirQ4L9+V3CmwBWdysG4IN6o3/Wc15T9ePEe5AN2q/o8G+d9Htb/X+Vj0OZZymRzvNj4Rm4lvSTz/SXUIRTLCNhXG+693jtzWbtoai2zjMIVbog9stU7MEFEvu1GKoVHHyQGoALMeARZzhN/sOOjLb6uzlcZ7duGNHtZtePnGfhAwzZreOQy/RkxMglKRYEWqlrTGlU4DcuD2Q41toLZ1jIO1Bznu1Qr6QC0PH6vc9RU+bZieQRUx2DzqhlapIe3orR6x10O9AqAhwElRvHhF2oTmmrR55TTlqLxeAhRCRYh9JQzYwX33l4WR/lA/b2ZSg0g2j8kbgrQZCgleoEgZDEjW1LKAC9y9VBu+SXjxfnSkLKrFj7Ce9qQAOGlTUAofGLTsORz3IMyYbvZ9/kLik5cEe0We/m2nCRCYwHhNnPM6P4v0zktpwqUA6i649QOn6+jTeYXsYIxEROxi9hSxI6ZAUeMFAa1VzdzgvK1YxqWoAw="
+  on:
+    tags: true
+    all_branches: true
