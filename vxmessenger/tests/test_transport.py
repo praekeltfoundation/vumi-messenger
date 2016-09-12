@@ -532,7 +532,7 @@ class TestMessengerTransport(VumiTestCase):
         msg = self.msg_helper.make_outbound('hello world', to_addr='123')
 
         self.assertEqual(
-            transport.construct_plain_reply(msg),
+            transport.construct_reply(msg),
             {
                 'message': {
                     'text': 'hello world'
@@ -568,7 +568,7 @@ class TestMessengerTransport(VumiTestCase):
             })
 
         self.assertEqual(
-            transport.construct_button_reply(msg),
+            transport.construct_reply(msg),
             {
                 'recipient': {
                     'id': '123',
@@ -624,7 +624,7 @@ class TestMessengerTransport(VumiTestCase):
         with self.assertRaisesRegexp(
                 UnsupportedMessage,
                 'Unknown button type "unknown"'):
-            transport.construct_button_reply(msg)
+            transport.construct_reply(msg)
 
     @inlineCallbacks
     def test_construct_quick_reply(self):
@@ -659,7 +659,7 @@ class TestMessengerTransport(VumiTestCase):
             })
 
         self.assertEqual(
-            transport.construct_quick_reply(msg),
+            transport.construct_reply(msg),
             {
                 'recipient': {
                     'id': '123',
@@ -713,7 +713,7 @@ class TestMessengerTransport(VumiTestCase):
         with self.assertRaisesRegexp(
                 UnsupportedMessage,
                 'Unknown quick reply type "unknown"'):
-            transport.construct_quick_reply(msg)
+            transport.construct_reply(msg)
 
     @inlineCallbacks
     def test_construct_generic_reply(self):
@@ -757,7 +757,7 @@ class TestMessengerTransport(VumiTestCase):
         self.maxDiff = None
 
         self.assertEqual(
-            transport.construct_generic_reply(msg),
+            transport.construct_reply(msg),
             {
                 'recipient': {
                     'id': '123',

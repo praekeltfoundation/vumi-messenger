@@ -1,2 +1,9 @@
 [run]
-omit = ve/*
+omit =
+    ve/*
+    vxmessenger/webapp/wsgi.py
+    vxmessenger/api.py
+    vxmessenger/plugins.py
+
+[report]
+show_missing = True
