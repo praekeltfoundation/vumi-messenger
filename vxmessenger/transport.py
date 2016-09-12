@@ -286,11 +286,14 @@ class MessengerTransport(HttpRpcTransport):
     def construct_reply(self, message):
         helper_metadata = message.get('helper_metadata', {})
         messenger_metadata = helper_metadata.get('messenger', {})
-        if messenger_metadata.get('template_type') == 'button':
-            return self.construct_button_reply(message)
 
-        if messenger_metadata.get('template_type') == 'generic':
+        template_type = messenger_metadata.get('template_type')
+        if template_type == 'button':
+            return self.construct_button_reply(message)
+        if template_type == 'generic':
             return self.construct_generic_reply(message)
+        if template_type == 'quick':
+            return self.construct_quick_reply(message)
 
         return self.construct_plain_reply(message)
 
@@ -359,6 +362,35 @@ class MessengerTransport(HttpRpcTransport):
                                      for element in button['elements']]
                     }
                 }
+            }
+        }
+
+    def construct_quick_button(self, btn):
+        typ = btn.get('type', 'text')
+        ret = {
+            'content_type': typ
+        }
+        if typ == 'text':
+            ret['title'] = btn['title']
+            ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
+            if btn.get('image_url'):
+                ret['image_url'] = btn['image_url']
+        elif typ == 'location':
+            pass
+        else:
+            raise UnsupportedMessage('Unknown quick reply type "%s"' % typ)
+        return ret
+
+    def construct_quick_reply(self, message):
+        button = message['helper_metadata']['messenger']
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'text': button['text'],
+                'quick_replies': [self.construct_quick_button(btn)
+                                  for btn in button['quick_replies']]
             }
         }
 

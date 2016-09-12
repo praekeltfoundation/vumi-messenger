@@ -559,6 +559,10 @@ class TestMessengerTransport(VumiTestCase):
                         'type': 'web_url',
                         'title': 'Mars',
                         'url': 'http://test',
+                    }, {
+                        'type': 'phone_number',
+                        'title': 'Venus',
+                        'payload': '+271234567',
                     }]
                 }
             })
@@ -585,6 +589,11 @@ class TestMessengerTransport(VumiTestCase):
                                     'type': 'web_url',
                                     'title': 'Mars',
                                     'url': 'http://test',
+                                },
+                                {
+                                    'type': 'phone_number',
+                                    'title': 'Venus',
+                                    'payload': '+271234567',
                                 }
                             ]
                         }
@@ -616,6 +625,95 @@ class TestMessengerTransport(VumiTestCase):
                 UnsupportedMessage,
                 'Unknown button type "unknown"'):
             transport.construct_button_reply(msg)
+
+    @inlineCallbacks
+    def test_construct_quick_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'quick',
+                    'text': 'hello world',
+                    'quick_replies': [{
+                        'title': 'Jupiter',
+                        'payload': {
+                            'content': '1',
+                        },
+                    }, {
+                        'type': 'text',
+                        'title': 'Mars',
+                        'payload': {
+                            'content': '2',
+                        },
+                    }, {
+                        'type': 'text',
+                        'title': 'Venus',
+                        'image_url': 'http://image',
+                        'payload': {
+                            'content': '3',
+                        },
+                    }, {
+                        'type': 'location',
+                    }]
+                }
+            })
+
+        self.assertEqual(
+            transport.construct_quick_reply(msg),
+            {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'text': 'hello world',
+                    'quick_replies': [
+                        {
+                            'content_type': 'text',
+                            'title': 'Jupiter',
+                            'payload': '{"content":"1"}',
+                        },
+                        {
+                            'content_type': 'text',
+                            'title': 'Mars',
+                            'payload': '{"content":"2"}',
+                        },
+                        {
+                            'content_type': 'text',
+                            'title': 'Venus',
+                            'payload': '{"content":"3"}',
+                            'image_url': 'http://image',
+                        },
+                        {
+                            'content_type': 'location',
+                        },
+                    ]
+                }
+            })
+
+    @inlineCallbacks
+    def test_construct_bad_quick_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'quick',
+                    'text': 'hello world',
+                    'quick_replies': [{
+                        'title': 'Jupiter',
+                        'payload': {
+                            'content': '1',
+                        },
+                    }, {
+                        'type': 'unknown',
+                        'title': 'Mars',
+                    }]
+                }
+            })
+
+        with self.assertRaisesRegexp(
+                UnsupportedMessage,
+                'Unknown quick reply type "unknown"'):
+            transport.construct_quick_reply(msg)
 
     @inlineCallbacks
     def test_construct_generic_reply(self):

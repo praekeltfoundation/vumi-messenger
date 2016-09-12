@@ -196,6 +196,42 @@ limits appy.
             }
         })
 
+A Quick Reply
+~~~~~~~~~~~~~
+
+Please be aware of the limitations_ that Facebook applies to these messages.
+A call to action may only have a maximum of 10 buttons and character count
+limits appy.
+
+A Quick Reply is similar to a button reply, but Messenger shows the buttons
+temporarily and they disappear after being pressed. You can also have up to
+10 buttons. Only ``postback`` buttons is allowed in this mode.
+
+.. code-block:: python
+
+    self.publish_message(
+        helper_metadata={
+            'messenger': {
+                'template_type': 'quick'
+                'text': 'The accompanying text with the button',
+                'quick_replies': [{ # Up to 10 quick replies
+                    'type': 'text', # defaults to text if not specified
+                    'title': 'Button 1',
+                    'image_url': 'The image_url to use', # This can be left blank
+                    'payload': {
+                        # In here you can put whatever you want to
+                        # 'content' and 'in_reply_to' will go into the standard vumi message
+                        'content': 'The content expected when a button is pressed', # This can be left blank
+                        'in_reply_to': 'The ID of the previous message', # This can be left blank
+                        # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
+                        'anything_extra': 'Bonus!'
+                    }
+                }, {
+                    'type': 'location',
+                }]
+            }
+        })
+
 
 Message format
 ==============
