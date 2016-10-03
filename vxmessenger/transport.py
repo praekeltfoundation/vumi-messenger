@@ -78,7 +78,25 @@ class Page(object):
 
         for entry in data.get('entry', []):
             for msg in entry.get('messaging', []):
-                if ('message' in msg) and ('text' in msg['message']):
+                if ('message' in msg) and ('quick_reply' in msg['message']):
+                    payload = json.loads(
+                        msg['message']['quick_reply']['payload']
+                    )
+                    in_reply_to = payload.get('in_reply_to')
+                    try:
+                        del payload['in_reply_to']
+                    except KeyError:
+                        pass
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=msg['message']['mid'],
+                        content=msg['message'].get('text', ''),
+                        in_reply_to=in_reply_to,
+                        timestamp=fb_timestamp(msg['timestamp']),
+                        extra=payload
+                    ))
+                elif ('message' in msg) and ('text' in msg['message']):
                     messages.append(cls(
                         to_addr=msg['recipient']['id'],
                         from_addr=msg['sender']['id'],
