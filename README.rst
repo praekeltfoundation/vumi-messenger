@@ -172,6 +172,14 @@ limits appy.
                     'title': 'The title',
                     'subtitle': 'The subtitle', # This can be left blank
                     'image_url': 'The image_url to use', # This can be left blank
+                    'item_url': 'The url if you click on the element', # Optional, Cannot be used with default_action
+                    'default_action': { # The action if you click on element, optional, Cannot be user with item_url
+                        'url': 'http://test',
+                        'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link
+                        'messenger_extensions': True,  # If you are using the js extensions api, optional
+                        'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
+                                                     # will use url if not found, optional
+                    },
                     'buttons': [{ # Up to 3 buttons
                         'type': 'postback', # defaults to postback if not specified
                         'title': 'Button 1',
@@ -191,8 +199,64 @@ limits appy.
                         'type': 'phone_number',
                         'title': 'Button 3',
                         'url': '+271234567'
+                    }, {
+                        # Share this post with friends. Only available in Generic Reply
+                        'type': 'element_share'
                     }]
                 }]
+            }
+        })
+
+A List Reply
+~~~~~~~~~~~~~~~
+
+Please be aware of the limitations_ that Facebook applies to these messages.
+A call to action may only have a maximum of 1 button per element, 2-4 elements, 1 extra button, and character count
+limits appy.
+
+.. code-block:: python
+
+    self.publish_message(
+        helper_metadata={
+            'messenger': {
+                'template_type': 'list'
+                'top_element_style': 'compact|large', # Defines top element style
+                                                      # Defaults to compact if not specified
+                'elements': [{ # 2 - 4 elements
+                    'title': 'The title',
+                    'subtitle': 'The subtitle', # This can be left blank
+                    'image_url': 'The image_url to use', # This can be left blank
+                    'default_action': { # The action if you click on element, optional
+                        'url': 'http://test',
+                        'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link, optional
+                        'messenger_extensions': True,  # If you are using the js extensions api, optional
+                        'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
+                                                     # will use url if not found, optional
+                    },
+                    'buttons': [{ # Up to 1 button
+                        'type': 'postback', # defaults to postback if not specified
+                        'title': 'Button 1',
+                        'payload': {
+                            # In here you can put whatever you want to
+                            # 'content' and 'in_reply_to' will go into the standard vumi message
+                            'content': 'The content expected when a button is pressed', # This can be left blank
+                            'in_reply_to': 'The ID of the previous message', # This can be left blank
+                            # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
+                            'anything_extra': 'Bonus!'
+                        }
+                    }, {
+                        'type': 'web_url',
+                        'title': 'Button 2',
+                        'url': 'http://some.url'
+                    }, {
+                        'type': 'phone_number',
+                        'title': 'Button 3',
+                        'url': '+271234567'
+                    }]
+                }],
+                'buttons': [{ # Up to 1 button at bottom of list
+                    ...
+                 }
             }
         })
 

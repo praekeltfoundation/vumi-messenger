@@ -310,6 +310,8 @@ class MessengerTransport(HttpRpcTransport):
             return self.construct_button_reply(message)
         if template_type == 'generic':
             return self.construct_generic_reply(message)
+        if template_type == 'list':
+            return self.construct_list_reply(message)
         if template_type == 'quick':
             return self.construct_quick_reply(message)
 
@@ -317,6 +319,8 @@ class MessengerTransport(HttpRpcTransport):
 
     def construct_button(self, btn):
         typ = btn.get('type', 'postback')
+        if typ == 'element_share':
+            return {'type': 'element_share'}
         ret = {
             'type': typ,
             'title': btn['title'],
@@ -325,6 +329,12 @@ class MessengerTransport(HttpRpcTransport):
             ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
         elif typ == 'web_url':
             ret['url'] = btn['url']
+            if 'webview_height_ratio' in btn:
+                ret['webview_height_ratio'] = btn['webview_height_ratio']
+                if 'messenger_extensions' in btn:
+                    ret['messenger_extensions'] = btn['messenger_extensions']
+                if 'fallback_url' in btn:
+                    ret['fallback_url'] = btn['fallback_url']
         elif typ == 'phone_number':
             ret['payload'] = btn['payload']
         else:
@@ -360,13 +370,28 @@ class MessengerTransport(HttpRpcTransport):
             ret['image_url'] = element['image_url']
         if element.get('item_url'):
             ret['item_url'] = element['item_url']
+        if element.get('default_action'):
+            act = element['default_action']
+            if 'url' in act:
+                defa = {
+                    'type': 'web_url',
+                    'url': act['url'],
+                }
+                if 'webview_height_ratio' in act:
+                    defa['webview_height_ratio'] = act['webview_height_ratio']
+                    if 'messenger_extensions' in act:
+                        defa['messenger_extensions'] =\
+                            act['messenger_extensions']
+                    if 'fallback_url' in act:
+                        defa['fallback_url'] = act['fallback_url']
+                ret['default_action'] = defa
         buttons = [self.construct_button(btn) for btn in element['buttons']]
         if buttons:
             ret['buttons'] = buttons
         return ret
 
     def construct_generic_reply(self, message):
-        button = message['helper_metadata']['messenger']
+        template = message['helper_metadata']['messenger']
         return {
             'recipient': {
                 'id': message['to_addr'],
@@ -377,8 +402,32 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': {
                         'template_type': 'generic',
                         'elements': [self.construct_element(element)
-                                     for element in button['elements']]
+                                     for element in template['elements']]
                     }
+                }
+            }
+        }
+
+    def construct_list_reply(self, message):
+        template = message['helper_metadata']['messenger']
+        payload = {
+            'template_type': 'list',
+            'top_element_style': template.get('top_element_style', 'compact'),
+            'elements': [self.construct_element(element)
+                         for element in template['elements']]
+        }
+        if 'buttons' in template:
+            btns = [self.construct_button(btn) for btn in template['buttons']]
+            if btns:
+                payload['buttons'] = btns
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': payload
                 }
             }
         }

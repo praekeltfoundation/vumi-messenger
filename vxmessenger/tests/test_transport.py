@@ -735,6 +735,8 @@ class TestMessengerTransport(VumiTestCase):
                             'type': 'web_url',
                             'title': 'Mars',
                             'url': 'http://test',
+                        }, {
+                            'type': 'element_share',
                         }]
                     }, {
                         'title': 'hello again',
@@ -779,6 +781,8 @@ class TestMessengerTransport(VumiTestCase):
                                     'type': 'web_url',
                                     'title': 'Mars',
                                     'url': 'http://test',
+                                }, {
+                                    'type': 'element_share',
                                 }]
                             }, {
                                 'title': 'hello again',
@@ -792,6 +796,126 @@ class TestMessengerTransport(VumiTestCase):
                                     'title': 'Venus',
                                     'url': 'http://test',
                                 }]
+                            }]
+                        }
+                    }
+                }
+            })
+
+    @inlineCallbacks
+    def test_construct_list_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'list',
+                    # 'top_element_style': 'compact',
+                    'elements': [{
+                        'title': 'hello world',
+                        'subtitle': 'arf',
+                        'default_action': {
+                            'url': 'http://test',
+                        },
+                        'buttons': [{
+                            'title': 'Jupiter',
+                            'payload': {
+                                'content': '1',
+                            },
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Mars',
+                            'url': 'http://test',
+                        }]
+                    }, {
+                        'title': 'hello again',
+                        'image_url': 'http://image',
+                        'default_action': {
+                            'url': 'http://test',
+                            'webview_height_ratio': 'compact',
+                            'messenger_extensions': False,
+                            'fallback_url': 'http://moo'
+                        },
+                        'buttons': [{
+                            'title': 'Mercury',
+                            'payload': {
+                                'content': '2',
+                            },
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Venus',
+                            'url': 'http://test',
+                            'webview_height_ratio': 'tall',
+                            'messenger_extensions': True,
+                            'fallback_url': 'http://moo'
+                        }]
+                    }
+                    ],
+                    'buttons': [{
+                        'title': 'Europa',
+                        'payload': {
+                            'content': '3',
+                        },
+                    }]
+                }
+            })
+
+        self.maxDiff = None
+
+        self.assertEqual(
+            transport.construct_reply(msg),
+            {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'attachment': {
+                        'type': 'template',
+                        'payload': {
+                            'template_type': 'list',
+                            'top_element_style': 'compact',
+                            'elements': [{
+                                'title': 'hello world',
+                                'subtitle': 'arf',
+                                'default_action': {
+                                    'type': 'web_url',
+                                    'url': 'http://test',
+                                },
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Jupiter',
+                                    'payload': '{"content":"1"}',
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Mars',
+                                    'url': 'http://test',
+                                }]
+                            }, {
+                                'title': 'hello again',
+                                'image_url': 'http://image',
+                                'default_action': {
+                                    'type': 'web_url',
+                                    'url': 'http://test',
+                                    'webview_height_ratio': 'compact',
+                                    'messenger_extensions': False,
+                                    'fallback_url': 'http://moo'
+                                },
+                                'buttons': [{
+                                    'type': 'postback',
+                                    'title': 'Mercury',
+                                    'payload': '{"content":"2"}',
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Venus',
+                                    'url': 'http://test',
+                                    'webview_height_ratio': 'tall',
+                                    'messenger_extensions': True,
+                                    'fallback_url': 'http://moo'
+                                }]
+                            }],
+                            'buttons': [{
+                                'type': 'postback',
+                                'title': 'Europa',
+                                'payload': '{"content":"3"}',
                             }]
                         }
                     }
