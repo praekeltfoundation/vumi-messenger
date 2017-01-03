@@ -921,3 +921,107 @@ class TestMessengerTransport(VumiTestCase):
                     }
                 }
             })
+
+    @inlineCallbacks
+    def test_construct_receipt_reply(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            'hello world', to_addr='123', helper_metadata={
+                'messenger': {
+                    'template_type': 'receipt',
+                    'recipient_name': 'recipient',
+                    'merchant_name': 'merchant',
+                    'order_url': 'http://example.com',
+                    'order_number': '123',
+                    'currency': 'ZAR',
+                    'payment_method': 'VISA',
+                    'timestamp': 'now',
+                    'elements': [
+                        {
+                            'title': 'item 1',
+                            'subtitle': 'this is an element',
+                            'price': 20,
+                            'quantity': 2,
+                            'currency': 'ZAR',
+                            'image_url': 'http://example.com',
+                        },
+                        {
+                            'title': 'item 2',
+                            'price': 10,
+                        },
+                    ],
+                    'address': {
+                        'street_1': '44 Stanley Avenue',
+                        'street_2': '',
+                        'city': 'Johannesburg',
+                        'postal_code': '1234',
+                        'state': 'Gauteng',
+                        'country': 'RSA',
+                    },
+                    'summary': {
+                        'subtotal': 40.0,
+                        'shipping_cost': 10.0,
+                        'total_tax': 14.0,
+                        'total_cost': 64.0,
+                    },
+                    'adjustments': [
+                        {'name': 'discount', 'amount': 10},
+                        {'name': 'coupon', 'amount': 5},
+                    ],
+                },
+            })
+
+        self.maxDiff = None
+
+        self.assertEqual(transport.construct_reply(msg), {
+            'recipient': {
+                'id': '123',
+            },
+            'message': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'receipt',
+                        'recipient_name': 'recipient',
+                        'merchant_name': 'merchant',
+                        'order_url': 'http://example.com',
+                        'order_number': '123',
+                        'currency': 'ZAR',
+                        'payment_method': 'VISA',
+                        'timestamp': 'now',
+                        'elements': [
+                            {
+                                'title': 'item 1',
+                                'subtitle': 'this is an element',
+                                'price': 20,
+                                'quantity': 2,
+                                'currency': 'ZAR',
+                                'image_url': 'http://example.com',
+                            },
+                            {
+                                'title': 'item 2',
+                                'price': 10,
+                            },
+                        ],
+                        'address': {
+                            'street_1': '44 Stanley Avenue',
+                            'street_2': '',
+                            'city': 'Johannesburg',
+                            'postal_code': '1234',
+                            'state': 'Gauteng',
+                            'country': 'RSA',
+                        },
+                        'summary': {
+                            'subtotal': 40.0,
+                            'shipping_cost': 10.0,
+                            'total_tax': 14.0,
+                            'total_cost': 64.0,
+                        },
+                        'adjustments': [
+                            {'name': 'discount', 'amount': 10},
+                            {'name': 'coupon', 'amount': 5},
+                        ],
+                    },
+                },
+            },
+        })
