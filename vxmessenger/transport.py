@@ -457,8 +457,7 @@ class MessengerTransport(HttpRpcTransport):
             'order_number': template['order_number'],
             'currency': template['currency'],
             'payment_method': template['payment_method'],
-            'recipient_name': template.get('recipient_name',
-                                           message['to_addr']),
+            'recipient_name': template['recipient_name'],
             'summary': {
                 'total_cost': template['summary']['total_cost'],
             },
@@ -475,11 +474,10 @@ class MessengerTransport(HttpRpcTransport):
                 'country': template['address']['country'],
                 'postal_code': template['address']['postal_code'],
             }
-        if template.get('adjustments'):
-            payload['adjustments'] = template['adjustments']
 
         # Remaining non-required fields
-        for field in {'merchant_name', 'order_url', 'timestamp', 'address'}:
+        for field in {'merchant_name', 'order_url', 'timestamp',
+                      'adjustments'}:
             if template.get(field):
                 payload[field] = template[field]
         for field in {'subtotal', 'total_tax', 'shipping_cost'}:
