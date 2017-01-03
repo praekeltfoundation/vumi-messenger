@@ -260,6 +260,60 @@ limits appy.
             }
         })
 
+A Receipt Reply
+~~~~~~~~~~~~~~~
+
+Please be aware of the limitations_ that Facebook applies to these messages.
+.. code-block:: python
+
+    self.publish_message(
+        helper_metadata={
+            'messenger': {
+                'template_type': 'receipt',
+                'order_number': '123', # Must be unique
+                'currency' 'ZAR'
+                'payment_method': 'EFT',
+                'recipient_name': 'John Doe',
+                'summary': {
+                    'total_cost': 100.0,
+                    # Optional fields
+                    'subtotal': 40.0,
+                    'total_tax': 10.0,
+                    'shipping_cost': 10.00,
+                },
+                # Optional fields
+                'merchant_name': 'XYZ Inc.'
+                'order_url': 'http://example.com',
+                'timestamp': '12345678',
+                'elements': [
+                    # Up to 100 elements
+                    {
+                        'title': 'element title',
+                        'price': 10
+                        # Optional fields
+                        'subtitle': 'element subtitle',
+                        'quantity': 1,
+                        'currency': 'ZAR',
+                        'image_url': 'http://example.com',
+                    },
+                ],
+                'adjustments': [
+                    {
+                        'name': 'discount',
+                        'amount': 1,
+                    },
+                ],
+                'address': {
+                    'street_1': '1 Main Street',
+                    'street_2': 'Suburb' # This field is optional
+                    'city': 'Cape Town',
+                    'state': 'WC',
+                    'country': 'RSA',
+                    'postal_code': '1234',
+                },
+            },
+        })
+
 A Quick Reply
 ~~~~~~~~~~~~~
 
@@ -308,12 +362,12 @@ Contains a dict ``messenger`` with the following keys:
 
 ``mid``:
     Messenger message id.
-    
+
 ``attachments``:
     List containing dictionaries as such:
-    
+
     .. code-block:: json
-    
+
         {
             "type":"image",
             "payload": {
@@ -325,7 +379,7 @@ Contains a dict ``messenger`` with the following keys:
     Dict containing a ``ref`` key, which is the PASS_THROUGH_PARAM as defined by:
 
     https://developers.facebook.com/docs/messenger-platform/plugin-reference#send_to_messenger
- 
+
 Other items defined in ``payload``:
     e.g. ``"anything_extra": "Bonus"``
 
@@ -336,7 +390,7 @@ Contains a dict ``messenger`` with the same data as ``transport_metadata`` and t
 Note: only if ``retrieve_profile`` is configured as ``true``
 
 .. code-block:: json
-    
+
     {
         "first_name": "Firstname",
         "last_name": "Lastname",
@@ -348,7 +402,7 @@ Supported webhooks
 
 ``messages``:
     Standard conversational messages & attachments.
-    
+
 ``messaging_postbacks``:
     Postback buttons.
 
