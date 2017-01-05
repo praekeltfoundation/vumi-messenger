@@ -317,6 +317,10 @@ class MessengerTransport(HttpRpcTransport):
         if template_type == 'receipt':
             return self.construct_receipt_reply(message)
 
+        media = messenger_metadata.get('media', {})
+        if media.get('type', '') in {'audio', 'video', 'image', 'file'}:
+            return self.construct_media_reply(message)
+
         return self.construct_plain_reply(message)
 
     def construct_button(self, btn):
@@ -492,6 +496,22 @@ class MessengerTransport(HttpRpcTransport):
                 'attachment': {
                     'type': 'template',
                     'payload': payload,
+                },
+            },
+        }
+
+    def construct_media_reply(self, message):
+        media = message['helper_metadata']['messenger']['media']
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': media['type'],
+                    'payload': {
+                        'url': media['url'],
+                    },
                 },
             },
         }
