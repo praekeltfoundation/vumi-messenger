@@ -971,8 +971,6 @@ class TestMessengerTransport(VumiTestCase):
                 },
             })
 
-        self.maxDiff = None
-
         self.assertEqual(transport.construct_reply(msg), {
             'recipient': {
                 'id': '123',
@@ -1023,5 +1021,57 @@ class TestMessengerTransport(VumiTestCase):
                         ],
                     },
                 },
+            },
+        })
+
+    @inlineCallbacks
+    def test_construct_media_reply_good_types(self):
+        MEDIA_TYPES = {'image', 'video', 'audio', 'file'}
+        transport = yield self.mk_transport()
+
+        for media_type in MEDIA_TYPES:
+            msg = self.msg_helper.make_outbound(
+                content=None, to_addr='123', helper_metadata={
+                    'messenger': {
+                        'media': {
+                            'type': media_type,
+                            'url': 'http://example.com',
+                        },
+                    },
+                })
+
+            self.assertEqual(transport.construct_reply(msg), {
+                'recipient': {
+                    'id': '123',
+                },
+                'message': {
+                    'attachment': {
+                        'type': media_type,
+                        'payload': {
+                            'url': 'http://example.com',
+                        },
+                    },
+                },
+            })
+
+    @inlineCallbacks
+    def test_construct_media_reply_bad_types(self):
+        transport = yield self.mk_transport()
+        msg = self.msg_helper.make_outbound(
+            content='text', to_addr='123', helper_metadata={
+                'messenger': {
+                    'media': {
+                        'type': 'gif',
+                        'url': 'http://example.com',
+                    },
+                },
+            })
+
+        self.assertEqual(transport.construct_reply(msg), {
+            'recipient': {
+                'id': '123',
+            },
+            'message': {
+                'text': 'text',
             },
         })
