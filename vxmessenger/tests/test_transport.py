@@ -79,6 +79,78 @@ class TestMessengerTransport(VumiTestCase):
         returnValue(transport)
 
     @inlineCallbacks
+    def test_add_request(self):
+        transport = yield self.mk_transport()
+        request = {'foo': 'bar'}
+        yield transport.add_request(request)
+
+        self.assertEqual(transport.queue_len, 1)
+
+    @inlineCallbacks
+    def test_dispatch_requests(self):
+        transport = yield self.mk_transport(access_token='access-token')
+        requests = [
+            {
+                'message_id': '123',
+                'method': 'POST',
+                'relative_url': 'foo',
+                'body': {'param': 'value'},
+            },
+            {
+                'message_id': '456',
+                'method': 'GET',
+                'relative_url': 'bar',
+                'body': '',
+            },
+        ]
+        batch = []
+        for i, req in enumerate(requests):
+            batch.append(req)
+            del batch[i]['message_id']
+            yield transport.add_request(req)
+
+        d = transport.dispatch_requests()
+        request_d, args, kwargs = yield transport.request_queue.get()
+        request_d.callback(DummyResponse(200, json.dumps({})))
+
+        method, url, data = args
+        self.assertEqual(method, 'POST')
+        self.assertEqual(url, 'https://graph.facebook.com')
+        self.assertEqual(data, {
+            'access_token': 'access-token',
+            'include_headers': False,
+            'batch': batch,
+        })
+        yield d
+
+    @inlineCallbacks
+    def test_handle_batch_response_all_types(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [
+            {'message_id': '1'}, {'message_id': '2'}, {'message_id': '3'},
+        ]
+        response = DummyResponse(200, json.dumps([
+            {
+                'code': 200,
+                'body': 'success!',
+            },
+            {
+                'code': 400,
+                'body': json.dumps({'error': {
+                    'code': 400,
+                    'message': 'bad request',
+                }}),
+            },
+            None,   # the request could not be completed or timed out
+        ]))
+
+        yield transport.handle_batch_response(response)
+        self.assertEqual(transport.pending_requests, [])
+
+        request = yield transport.redis.lpop('request_queue')
+        self.assertEqual(request, json.dumps({'message_id': '3'}))
+
+    @inlineCallbacks
     def test_hub_challenge(self):
         yield self.mk_transport()
         res = yield self.tx_helper.mk_request_raw(

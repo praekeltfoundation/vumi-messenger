@@ -9,10 +9,13 @@ from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue
 from twisted.internet.error import TimeoutError
+from twisted.internet.task import LoopingCall
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vumi.config import ConfigText, ConfigDict, ConfigBool
+from vumi.config import (ConfigText, ConfigDict, ConfigBool, ConfigInt,
+                         ConfigFloat)
+from vumi.persist.txredis_manager import TxRedisManager
 from vumi.transports.httprpc import HttpRpcTransport
 
 
@@ -35,6 +38,15 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
     retrieve_profile = ConfigBool(
         "Set to true to include the user profile details in "
         "the helper_metadata", required=False, default=False)
+    request_batch_size = ConfigInt(
+        "The maximum number of requests to send using using batch API calls",
+        required=False, default=50, static=True)
+    request_batch_wait_time = ConfigFloat(
+        "The time to wait between batch API calls (in seconds)",
+        required=False, default=0.1, static=True)
+    redis_manager = ConfigDict(
+        "Parameters to connect to Redis with",
+        required=False, default={}, static=True)
 
 
 class Page(object):
@@ -162,6 +174,7 @@ class UnsupportedMessage(MessengerTransportException):
 class MessengerTransport(HttpRpcTransport):
 
     CONFIG_CLASS = MessengerTransportConfig
+    BATCH_API_URL = 'https://graph.facebook.com'
     transport_type = 'facebook'
     clock = reactor
 
@@ -175,6 +188,16 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
+
+        static_config = self.get_static_config()
+        self.batch_size = static_config.request_batch_size
+        self.batch_time = static_config.request_batch_wait_time
+
+        self.queue_len = 0
+        self.pending_requests = []
+        self.redis = yield TxRedisManager.from_config(
+            static_config.redis_manager)
+
         if self.config.get('welcome_message'):
             if not self.config.get('page_id'):
                 self.log.error('page_id is required for welcome_message')
@@ -187,12 +210,87 @@ class MessengerTransport(HttpRpcTransport):
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
+        self._request_loop = LoopingCall(self.dispatch_requests)
+        self._start_request_loop(self._request_loop)
+
     @inlineCallbacks
     def teardown_transport(self):
         if hasattr(self, 'web_resource'):
             yield self.web_resource.loseConnection()
             if self.request_gc.running:
                 self.request_gc.stop()
+
+        self._request_loop.stop()
+        # TODO: teardown redis
+
+    def _start_request_loop(self, loop):
+        loop.start(self.batch_time).addErrback(self._request_loop_error)
+
+    def _request_loop_error(self, failure):
+        self.log.info('Error in request_loop: %s' % failure)
+        self.log.info('Restarting request_loop...')
+        self._start_request_loop(self._request_loop)
+
+    @inlineCallbacks
+    def add_request(self, request):
+        req_string = json.dumps(request)
+        self.queue_len = yield self.redis.rpush('request_queue', req_string)
+
+    @inlineCallbacks
+    def dispatch_requests(self):
+        batch_size = (self.batch_size if self.batch_size <= self.queue_len
+                      else self.queue_len)
+        if batch_size == 0:
+            return
+
+        data = {
+            'access_token': self.config['access_token'],
+            'include_headers': False,
+            'batch': [],
+        }
+        for i in range(0, batch_size):
+            req_string = yield self.redis.lpop('request_queue')
+            request = json.loads(req_string)
+            self.pending_requests.append(request)
+            data['batch'].append({
+                'method': request['method'],
+                'relative_url': request['relative_url'],
+                'body': request.get('body', ''),
+            })
+
+        response = yield self.request('POST', self.BATCH_API_URL, data)
+        if response.code == http.OK:
+            yield self.handle_batch_response(response)
+        else:
+            yield self.handle_batch_error(response)
+
+    @inlineCallbacks
+    def handle_batch_response(self, response):
+        content = yield response.json()
+        for i, res in enumerate(content):
+            req = self.pending_requests[i]
+            if res is None:
+                # Request was not completed, add to queue again
+                yield self.add_request(req)
+            elif res.get('code') == http.OK:
+                self.handle_outbound_success(req['message_id'])
+            else:
+                body = json.loads(res['body'])
+                fail_type = self.SEND_FAIL_TYPES.get(body['error']['code'],
+                                                     'request_fail_unknown')
+                self.handle_outbound_failure(req['message_id'],
+                                             body['error']['message'],
+                                             fail_type)
+        self.pending_requests = []
+
+    def handle_batch_error(self, response):
+        pass
+
+    def handle_outbound_success(self, message_id):
+        pass
+
+    def handle_outbound_failure(self, message_id, reason, status_type):
+        pass
 
     @inlineCallbacks
     def setup_welcome_message(self, welcome_message_payload, page_id):
