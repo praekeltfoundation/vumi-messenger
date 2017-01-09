@@ -314,6 +314,12 @@ class MessengerTransport(HttpRpcTransport):
             return self.construct_list_reply(message)
         if template_type == 'quick':
             return self.construct_quick_reply(message)
+        if template_type == 'receipt':
+            return self.construct_receipt_reply(message)
+
+        media = messenger_metadata.get('media', {})
+        if media.get('type', '') in {'audio', 'video', 'image', 'file'}:
+            return self.construct_media_reply(message)
 
         return self.construct_plain_reply(message)
 
@@ -430,6 +436,84 @@ class MessengerTransport(HttpRpcTransport):
                     'payload': payload
                 }
             }
+        }
+
+    def construct_receipt_reply(self, message):
+        template = message['helper_metadata']['messenger']
+
+        def construct_receipt_element(element):
+            ret = {
+                'title': element['title'],
+                'price': element['price'],
+            }
+            if element.get('image_url'):
+                ret['image_url'] = element['image_url']
+            if element.get('subtitle'):
+                ret['subtitle'] = element['subtitle']
+            if element.get('quantity'):
+                ret['quantity'] = element['quantity']
+            if element.get('currency'):
+                ret['currency'] = element['currency']
+            return ret
+
+        payload = {
+            'template_type': 'receipt',
+            'order_number': template['order_number'],
+            'currency': template['currency'],
+            'payment_method': template['payment_method'],
+            'recipient_name': template['recipient_name'],
+            'summary': {
+                'total_cost': template['summary']['total_cost'],
+            },
+        }
+        if template.get('elements'):
+            payload['elements'] = [construct_receipt_element(element)
+                                   for element in template['elements']]
+        if template.get('address'):
+            payload['address'] = {
+                'street_1': template['address']['street_1'],
+                'street_2': template['address'].get('street_2', ''),
+                'city': template['address']['city'],
+                'state': template['address']['state'],
+                'country': template['address']['country'],
+                'postal_code': template['address']['postal_code'],
+            }
+
+        # Remaining non-required fields
+        for field in {'merchant_name', 'order_url', 'timestamp',
+                      'adjustments'}:
+            if template.get(field):
+                payload[field] = template[field]
+        for field in {'subtotal', 'total_tax', 'shipping_cost'}:
+            if template['summary'].get(field):
+                payload['summary'][field] = template['summary'][field]
+
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': payload,
+                },
+            },
+        }
+
+    def construct_media_reply(self, message):
+        media = message['helper_metadata']['messenger']['media']
+        return {
+            'recipient': {
+                'id': message['to_addr'],
+            },
+            'message': {
+                'attachment': {
+                    'type': media['type'],
+                    'payload': {
+                        'url': media['url'],
+                    },
+                },
+            },
         }
 
     def construct_quick_button(self, btn):
