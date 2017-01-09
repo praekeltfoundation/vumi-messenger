@@ -31,5 +31,6 @@ def cli(interface, port, token):
     store = WebhookService(token)
     store.app.run(interface, port)
 
+
 if __name__ == '__main__':
     cli()
