@@ -264,6 +264,7 @@ A Receipt Reply
 ~~~~~~~~~~~~~~~
 
 Please be aware of the limitations_ that Facebook applies to these messages.
+
 .. code-block:: python
 
     self.publish_message(
