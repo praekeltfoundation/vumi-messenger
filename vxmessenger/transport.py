@@ -248,6 +248,8 @@ class MessengerTransport(HttpRpcTransport):
         }
         for i in range(0, batch_size):
             req_string = yield self.redis.lpop('request_queue')
+            if req_string is None:
+                continue
             request = json.loads(req_string)
             self.pending_requests.append(request)
             data['batch'].append({
@@ -283,11 +285,12 @@ class MessengerTransport(HttpRpcTransport):
 
         self.pending_requests = []
 
+    @inlineCallbacks
     def handle_batch_error(self, response):
         # It's possible that some requests might still have been completed
         try:
             yield self.handle_batch_response(response)
-        except ValueError, KeyError:
+        except (ValueError, KeyError, AttributeError):
             pass
 
         code = response.code

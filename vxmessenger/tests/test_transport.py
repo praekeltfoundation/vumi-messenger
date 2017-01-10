@@ -6,13 +6,14 @@ from vumi.tests.utils import MockHttpServer
 from twisted.internet import reactor
 from twisted.internet.defer import (
     inlineCallbacks, returnValue, DeferredQueue, Deferred)
-from twisted.internet.task import Clock
+from twisted.internet.task import Clock, LoopingCall
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
 from vxmessenger.transport import MessengerTransport, UnsupportedMessage
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
 from vumi.tests.helpers import MessageHelper
+from vumi.tests.utils import LogCatcher
 
 import treq
 
@@ -85,6 +86,46 @@ class TestMessengerTransport(VumiTestCase):
         yield transport.add_request(request)
 
         self.assertEqual(transport.queue_len, 1)
+
+    @inlineCallbacks
+    def test_request_loop_errback(self):
+        transport = yield self.mk_transport()
+
+        def _raise_error():
+            raise Exception('This is an error!')
+
+        with LogCatcher(message='request_loop') as lc:
+            transport._request_loop = LoopingCall(_raise_error)
+            transport._start_request_loop(transport._request_loop)
+            logs = set(lc.messages())
+
+            transport._request_loop = LoopingCall(lambda _: None)
+
+        self.assertTrue({
+            'Error in request_loop: This is an error!',
+            'Restarting request_loop...',
+        }.issubset(logs))
+
+    @inlineCallbacks
+    def test_batch_error_no_json(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [{'message_id': '1'}]
+
+        yield transport.handle_batch_error(DummyResponse(400, 'fail'))
+        yield self.assert_outbound_failure('1', 'Batch request failed (400)',
+                                           'batch_request_fail')
+
+    @inlineCallbacks
+    def test_batch_error_with_json(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [{'message_id': '1'}]
+
+        yield transport.handle_batch_error(DummyResponse(400, json.dumps({
+            'this': 'is',
+            'nonsense': 'json',
+        })))
+        yield self.assert_outbound_failure('1', 'Batch request failed (400)',
+                                           'batch_request_fail')
 
     @inlineCallbacks
     def test_dispatch_requests(self):
