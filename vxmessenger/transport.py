@@ -219,15 +219,13 @@ class MessengerTransport(HttpRpcTransport):
             yield self.web_resource.loseConnection()
             if self.request_gc.running:
                 self.request_gc.stop()
-
         self._request_loop.stop()
-        # TODO: teardown redis
 
     def _start_request_loop(self, loop):
         loop.start(self.batch_time).addErrback(self._request_loop_error)
 
     def _request_loop_error(self, failure):
-        self.log.info('Error in request_loop: %s' % failure)
+        self.log.info('Error in request_loop: %s' % failure.getErrorMessage())
         self.log.info('Restarting request_loop...')
         self._start_request_loop(self._request_loop)
 
@@ -258,7 +256,8 @@ class MessengerTransport(HttpRpcTransport):
                 'body': request.get('body', ''),
             })
 
-        response = yield self.request('POST', self.BATCH_API_URL, data)
+        response = yield self.request('POST', self.BATCH_API_URL, data,
+                                      pool=self.pool)
         if response.code == http.OK:
             yield self.handle_batch_response(response)
         else:
@@ -273,24 +272,52 @@ class MessengerTransport(HttpRpcTransport):
                 # Request was not completed, add to queue again
                 yield self.add_request(req)
             elif res.get('code') == http.OK:
-                self.handle_outbound_success(req['message_id'])
+                yield self.handle_outbound_success(
+                    req['message_id'], res['body']['message_id'])
             else:
                 body = json.loads(res['body'])
-                fail_type = self.SEND_FAIL_TYPES.get(body['error']['code'],
-                                                     'request_fail_unknown')
-                self.handle_outbound_failure(req['message_id'],
-                                             body['error']['message'],
-                                             fail_type)
+                fail_type = self.SEND_FAIL_TYPES.get(
+                    body['error']['code'], 'request_fail_unknown')
+                yield self.handle_outbound_failure(
+                    req['message_id'], body['error']['message'], fail_type)
+
         self.pending_requests = []
 
     def handle_batch_error(self, response):
-        pass
+        # It's possible that some requests might still have been completed
+        try:
+            yield self.handle_batch_response(response)
+        except ValueError, KeyError:
+            pass
 
-    def handle_outbound_success(self, message_id):
-        pass
+        code = response.code
+        for req in self.pending_requests:
+            yield self.handle_outbound_failure(
+                req['message_id'], 'Batch request failed (%s)' % code,
+                'batch_request_fail')
 
+    @inlineCallbacks
+    def handle_outbound_success(self, user_message_id, sent_message_id):
+        yield self.publish_ack(
+            user_message_id=user_message_id,
+            sent_message_id=sent_message_id)
+        yield self.add_status(
+            component='outbound',
+            status='ok',
+            type='request_success',
+            message='Request successful')
+
+    @inlineCallbacks
     def handle_outbound_failure(self, message_id, reason, status_type):
-        pass
+        yield self.publish_nack(
+            user_message_id=message_id,
+            sent_message_id=message_id,
+            reason=reason)
+        yield self.add_status(
+            component='outbound',
+            status='down',
+            type=status_type,
+            message=reason)
 
     @inlineCallbacks
     def setup_welcome_message(self, welcome_message_payload, page_id):
@@ -574,48 +601,14 @@ class MessengerTransport(HttpRpcTransport):
         self.log.info("MessengerTransport outbound %r" % (message,))
         reply = self.construct_reply(message)
         self.log.info("Reply: %s" % (reply,))
-        try:
-            resp = yield self.request(
-                method='POST',
-                url='%s?access_token=%s' % (self.config['outbound_url'],
-                                            self.config['access_token']),
-                data=json.dumps(reply, separators=(',', ':')),
-                headers={
-                    'Content-Type': 'application/json',
-                },
-                pool=self.pool)
 
-            data = yield resp.json()
-            self.log.info('API reply: %s' % (data,))
-
-            if resp.code == http.OK:
-                yield self.publish_ack(
-                    user_message_id=message['message_id'],
-                    sent_message_id=data['message_id'])
-                yield self.add_status(
-                    component='outbound',
-                    status='ok',
-                    type='request_success',
-                    message='Request successful')
-            else:
-                yield self.nack(
-                    message, data['error']['message'],
-                    self.SEND_FAIL_TYPES.get(
-                        data['error']['code'], 'request_fail_unknown'))
-        except (TimeoutError,), e:
-            yield self.nack(message, e, 'request_fail_unknown')
-
-    @inlineCallbacks
-    def nack(self, message, reason, status_type):
-        yield self.publish_nack(
-            user_message_id=message['message_id'],
-            sent_message_id=message['message_id'],
-            reason=reason)
-        yield self.add_status(
-            component='outbound',
-            status='down',
-            type=status_type,
-            message=reason)
+        request = {
+            'message_id': message['message_id'],
+            'method': 'POST',
+            'relative_url': 'v2.6/me/messages',
+            'body': json.dumps(reply)
+        }
+        yield self.add_request(request)
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel

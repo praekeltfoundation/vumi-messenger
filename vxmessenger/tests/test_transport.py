@@ -132,7 +132,9 @@ class TestMessengerTransport(VumiTestCase):
         response = DummyResponse(200, json.dumps([
             {
                 'code': 200,
-                'body': 'success!',
+                'body': {
+                    'message_id': '123',
+                },
             },
             {
                 'code': 400,
@@ -563,7 +565,7 @@ class TestMessengerTransport(VumiTestCase):
         })
 
     @inlineCallbacks
-    def test_outbound(self):
+    def test_good_outbound(self):
         transport = yield self.mk_transport(access_token='access_token')
 
         d = self.tx_helper.make_dispatch_outbound(
@@ -573,30 +575,99 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
-        self.assertEqual(json.loads(data), {
-            'message': {
-                'text': 'hi',
-            },
-            'recipient': {
-                'id': '+123',
-            }
+        self.assertEqual(data, {
+            'access_token': 'access_token',
+            'include_headers': False,
+            'batch': [
+                {
+                    'method': 'POST',
+                    'relative_url': 'v2.6/me/messages',
+                    'body': json.dumps({
+                        'message': {'text': 'hi'},
+                        'recipient': {'id': '+123'},
+                    })
+                },
+            ],
         })
-        request_d.callback(DummyResponse(200, json.dumps({
-            'message_id': 'the-message-id'
-        })))
+        request_d.callback(DummyResponse(200, json.dumps([
+            {
+                'code': 200,
+                'body': {
+                    'message_id': 'the-message-id',
+                },
+            },
+        ])))
 
         msg = yield d
-        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        yield self.assert_outbound_success(msg['message_id'], 'the-message-id')
 
-        self.assertEqual(ack['user_message_id'], msg['message_id'])
-        self.assertEqual(ack['sent_message_id'], 'the-message-id')
+    @inlineCallbacks
+    def test_bad_outbound(self):
+        transport = yield self.mk_transport(access_token='access_token',
+                                            request_batch_wait_time=0.00001)
+
+        d = self.tx_helper.make_dispatch_outbound(
+            from_addr='456',
+            to_addr='+123',
+            content='bye')
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        # We send a 200 response because we only want to emulate a single
+        # request failing - the batch request should succeed
+        request_d.callback(DummyResponse(200, json.dumps([
+            {
+                'code': 401,
+                'body': json.dumps({
+                    'error': {
+                        'code': 10,
+                        'message': 'not authourized'
+                    },
+                }),
+            },
+        ])))
+
+        msg = yield d
+        yield self.assert_outbound_failure(
+            msg['message_id'], 'not authourized',
+            'application_does_not_have_permissions')
+
+    @inlineCallbacks
+    def test_handle_outbound_success(self):
+        transport = yield self.mk_transport()
+        yield transport.handle_outbound_success('1', '2')
+        yield self.assert_outbound_success('1', '2')
+
+    @inlineCallbacks
+    def test_handle_outbound_failure(self):
+        transport = yield self.mk_transport()
+        yield transport.handle_outbound_failure('1', 'fail', 'status')
+        yield self.assert_outbound_failure('1', 'fail', 'status')
+
+    @inlineCallbacks
+    def assert_outbound_success(self, user_message_id, sent_message_id):
+        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(ack['user_message_id'], user_message_id)
+        self.assertEqual(ack['sent_message_id'], sent_message_id)
 
         [status] = self.tx_helper.get_dispatched_statuses()
-
         self.assertEqual(status['status'], 'ok')
         self.assertEqual(status['component'], 'outbound')
         self.assertEqual(status['type'], 'request_success')
         self.assertEqual(status['message'], 'Request successful')
+
+    @inlineCallbacks
+    def assert_outbound_failure(self, message_id, reason, status_type):
+        [nack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(nack['user_message_id'], message_id)
+        self.assertEqual(nack['sent_message_id'], message_id)
+
+        [status] = self.tx_helper.get_dispatched_statuses()
+        self.assertEqual(status['status'], 'down')
+        self.assertEqual(status['component'], 'outbound')
+        self.assertEqual(status['type'], status_type)
+        self.assertEqual(status['message'], reason)
 
     @inlineCallbacks
     def test_construct_plain_reply(self):
