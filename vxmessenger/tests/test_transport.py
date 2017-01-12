@@ -1,21 +1,18 @@
 import json
 
-from vumi.tests.helpers import VumiTestCase
-from vumi.tests.utils import MockHttpServer
-
+import treq
 from twisted.internet import reactor
-from twisted.internet.defer import (
-    inlineCallbacks, returnValue, DeferredQueue, Deferred)
-from twisted.internet.task import Clock, LoopingCall
+from twisted.internet.defer import (inlineCallbacks, returnValue,
+                                    DeferredQueue, Deferred)
+from twisted.internet.task import Clock
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vxmessenger.transport import MessengerTransport, UnsupportedMessage
+from vumi.tests.helpers import VumiTestCase, MessageHelper
+from vumi.tests.utils import LogCatcher, MockHttpServer
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
-from vumi.tests.helpers import MessageHelper
-from vumi.tests.utils import LogCatcher
 
-import treq
+from vxmessenger.transport import MessengerTransport, UnsupportedMessage
 
 
 class DummyResponse(object):
@@ -69,7 +66,7 @@ class TestMessengerTransport(VumiTestCase):
             'web_port': 0,
             'web_path': '/api',
             'publish_status': True,
-            'outbound_url': self.remote_server.url,
+            'outbound_url': 'https://graph.facebook.com',
             'username': 'root',
             'password': 't00r',
         }

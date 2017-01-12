@@ -3,12 +3,9 @@ from datetime import datetime
 from urllib import urlencode
 
 import treq
-
-
 from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
 from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
-from twisted.internet.error import TimeoutError
 from twisted.internet.task import LoopingCall
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
@@ -26,8 +23,7 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
         required=True)
     page_id = ConfigText(
         "The page id for the Messenger API",
-        required=False,
-        fallbacks=[SingleFieldFallback("app_id")])
+        required=False, fallbacks=[SingleFieldFallback("app_id")])
     app_id = ConfigText(
         "DEPRECATED The page app id for the Messenger API",
         required=False)
@@ -174,7 +170,6 @@ class UnsupportedMessage(MessengerTransportException):
 class MessengerTransport(HttpRpcTransport):
 
     CONFIG_CLASS = MessengerTransportConfig
-    BATCH_API_URL = 'https://graph.facebook.com'
     transport_type = 'facebook'
     clock = reactor
 
@@ -188,13 +183,13 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
+        self.BATCH_API_URL = self.config.get('outbound_url',
+                                             'https://graph.facebook.com')
 
         static_config = self.get_static_config()
         self.batch_size = static_config.request_batch_size
         self.batch_time = static_config.request_batch_wait_time
 
-        self.queue_len = 0
-        self.pending_requests = []
         self.redis = yield TxRedisManager.from_config(
             static_config.redis_manager)
 
@@ -210,6 +205,8 @@ class MessengerTransport(HttpRpcTransport):
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
+        self.queue_len = 0
+        self.pending_requests = []
         self._lock = DeferredLock()
         self._request_loop = LoopingCall(self.dispatch_requests)
         self._start_request_loop(self._request_loop)
