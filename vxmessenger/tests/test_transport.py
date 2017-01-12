@@ -95,8 +95,13 @@ class TestMessengerTransport(VumiTestCase):
         transport._request_loop.f = _raise_error
         with LogCatcher(message='request_loop') as lc:
             transport._start_request_loop(transport._request_loop)
+            self.assertFalse(transport._request_loop.running)
             logs = set(lc.messages())
 
+        transport._request_loop.f = transport.dispatch_requests
+        transport._start_request_loop(transport._request_loop)
+
+        self.assertTrue(transport._request_loop.running)
         self.assertEqual(logs, {
             'Error in request_loop: This is an error!',
             'Restarting request_loop...',
