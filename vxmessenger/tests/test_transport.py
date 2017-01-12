@@ -90,21 +90,20 @@ class TestMessengerTransport(VumiTestCase):
     @inlineCallbacks
     def test_request_loop_errback(self):
         transport = yield self.mk_transport()
+        transport._request_loop.stop()
 
         def _raise_error():
             raise Exception('This is an error!')
 
+        transport._request_loop.f = _raise_error
         with LogCatcher(message='request_loop') as lc:
-            transport._request_loop = LoopingCall(_raise_error)
             transport._start_request_loop(transport._request_loop)
             logs = set(lc.messages())
 
-            transport._request_loop = LoopingCall(lambda _: None)
-
-        self.assertTrue({
+        self.assertEqual(logs, {
             'Error in request_loop: This is an error!',
             'Restarting request_loop...',
-        }.issubset(logs))
+        })
 
     @inlineCallbacks
     def test_batch_error_no_json(self):
@@ -157,11 +156,11 @@ class TestMessengerTransport(VumiTestCase):
         method, url, data = args
         self.assertEqual(method, 'POST')
         self.assertEqual(url, 'https://graph.facebook.com')
-        self.assertEqual(data, {
-            'access_token': 'access-token',
-            'include_headers': False,
-            'batch': batch,
-        })
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'access-token')
+        self.assertEqual(json.loads(data['batch']), batch)
+
         yield d
 
     @inlineCallbacks
@@ -616,20 +615,18 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
-        self.assertEqual(data, {
-            'access_token': 'access_token',
-            'include_headers': False,
-            'batch': [
-                {
-                    'method': 'POST',
-                    'relative_url': 'v2.6/me/messages',
-                    'body': json.dumps({
-                        'message': {'text': 'hi'},
-                        'recipient': {'id': '+123'},
-                    })
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'access_token')
+        self.assertEqual(json.loads(data['batch']), [
+            {
+                'method': 'POST',
+                'relative_url': 'v2.6/me/messages',
+                'body': {
+                    'message': {'text': 'hi'},
+                    'recipient': {'id': '+123'},
                 },
-            ],
-        })
+            },
+        ])
         request_d.callback(DummyResponse(200, json.dumps([
             {
                 'code': 200,
