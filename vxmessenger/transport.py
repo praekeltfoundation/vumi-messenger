@@ -7,7 +7,7 @@ import treq
 
 from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, returnValue
+from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
 from twisted.internet.error import TimeoutError
 from twisted.internet.task import LoopingCall
 from twisted.web import http
@@ -210,6 +210,7 @@ class MessengerTransport(HttpRpcTransport):
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
+        self._lock = DeferredLock()
         self._request_loop = LoopingCall(self.dispatch_requests)
         self._start_request_loop(self._request_loop)
 
@@ -219,13 +220,15 @@ class MessengerTransport(HttpRpcTransport):
             yield self.web_resource.loseConnection()
             if self.request_gc.running:
                 self.request_gc.stop()
-        self._request_loop.stop()
+        if self._request_loop.running:
+            self._request_loop.stop()
 
     def _start_request_loop(self, loop):
-        loop.start(self.batch_time).addErrback(self._request_loop_error)
+        if not loop.running:
+            loop.start(self.batch_time).addErrback(self._request_loop_error)
 
     def _request_loop_error(self, failure):
-        self.log.info('Error in request_loop: %s' % failure.getErrorMessage())
+        self.log.info('Error in request_loop: %s' % failure.value)
         self.log.info('Restarting request_loop...')
         self._start_request_loop(self._request_loop)
 
@@ -236,6 +239,12 @@ class MessengerTransport(HttpRpcTransport):
 
     @inlineCallbacks
     def dispatch_requests(self):
+        yield self._lock.acquire()
+        yield self._dispatch_requests()
+        yield self._lock.release()
+
+    @inlineCallbacks
+    def _dispatch_requests(self):
         batch_size = (self.batch_size if self.batch_size <= self.queue_len
                       else self.queue_len)
         if batch_size == 0:
@@ -258,6 +267,7 @@ class MessengerTransport(HttpRpcTransport):
                 'body': request.get('body', ''),
             })
 
+        data['batch'] = json.dumps(data['batch'])
         response = yield self.request('POST', self.BATCH_API_URL, data,
                                       pool=self.pool)
         if response.code == http.OK:
@@ -609,7 +619,7 @@ class MessengerTransport(HttpRpcTransport):
             'message_id': message['message_id'],
             'method': 'POST',
             'relative_url': 'v2.6/me/messages',
-            'body': json.dumps(reply)
+            'body': reply,
         }
         yield self.add_request(request)
 
