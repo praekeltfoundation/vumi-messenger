@@ -1,0 +1,18 @@
+{
+  "type": "facebook",
+  "amqp_queue": "messenger_transport",
+  "public_http": {
+    "enabled": true,
+    "web_path": "messenger",
+    "web_port": 8000
+  },
+  "config": {
+    "web_path": "messenger",
+    "web_port": 8000,
+    "noisy": true,
+    "page_id": "154150685073677",
+    "retrieve_profile": true,
+    "outbound_url": "https://graph.facebook.com/v2.6/me/messages",
+    "access_token": "EAAZAZAhB6kp7UBAM3lyYLc3m931RwMiMjmBfX7oYo4lRMHWJo3dZCVI6ycvMBB9Wr2BZBXwJ8RJoIZBfz7VlCRSdATak7RWFHhARScZAgjq7QPB89pOtJTl3gRT3ZCgjLzRQzFxZCGRaWkK1e5xGcZBaYRgje8nU0FiuRytXcFX0xAwZDZD"
+  }
+}

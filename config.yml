@@ -1,0 +1,7 @@
+transport_name: "messenger"
+web_path: "messenger"
+web_port: 8000
+noisy: true
+page_id: "154150685073677"
+outbound_url: "https://graph.facebook.com/v2.6/me/messages"
+access_token: "EAAZAZAZAIZBhutIBAEL8D7kM5ZCjoZBRZCzozVf8TiZAHhETE1qtavJOWL9fOsVSliSFIfg8e2of8GEjgxim5ZCMVoMBy55kkzz4iXlGO0ap4XOW39WGZBLOlkG1qfmfy9GXwwn599r3VhGki4eWhIhdo5cVZAAT44lwZBASerc68ERIRgZDZD"

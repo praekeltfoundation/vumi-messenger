@@ -1,4 +1,5 @@
 import json
+from urllib import urlencode
 
 import treq
 from twisted.internet import reactor
@@ -619,16 +620,16 @@ class TestMessengerTransport(VumiTestCase):
         method, url, data = args
         self.assertFalse(data['include_headers'])
         self.assertEqual(data['access_token'], 'access_token')
-        self.assertEqual(json.loads(data['batch']), [
+        self.assertEqual(data['batch'], json.dumps([
             {
                 'method': 'POST',
                 'relative_url': 'v2.6/me/messages',
-                'body': {
-                    'message': {'text': 'hi'},
-                    'recipient': {'id': '+123'},
-                },
+                'body': urlencode({
+                    'message': {'text': u'hi'},
+                    'recipient': {'id': u'+123'},
+                }),
             },
-        ])
+        ]))
         request_d.callback(DummyResponse(200, json.dumps([
             {
                 'code': 200,

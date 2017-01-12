@@ -618,7 +618,7 @@ class MessengerTransport(HttpRpcTransport):
             'message_id': message['message_id'],
             'method': 'POST',
             'relative_url': 'v2.6/me/messages',
-            'body': reply,
+            'body': urlencode(reply),
         }
         yield self.add_request(request)
 
