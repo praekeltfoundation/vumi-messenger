@@ -237,8 +237,10 @@ class MessengerTransport(HttpRpcTransport):
     @inlineCallbacks
     def dispatch_requests(self):
         yield self._lock.acquire()
-        yield self._dispatch_requests()
-        yield self._lock.release()
+        try:
+            yield self._dispatch_requests()
+        finally:
+            yield self._lock.release()
 
     @inlineCallbacks
     def _dispatch_requests(self):
