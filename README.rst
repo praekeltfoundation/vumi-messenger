@@ -53,8 +53,9 @@ save it as a file called ``config.json``:
         "noisy": true,
         "page_id": "YOUR_FB_PAGE_ID",
         "retrieve_profile": false,
-        "outbound_url": "https://graph.facebook.com/v2.6/me/messages",
+        "outbound_url": "https://graph.facebook.com/v2.8/me/messages",
         "access_token": "YOUR_FB_ACCESS_TOKEN",
+        "redis_manager": {},
         "request_batch_size": 50,
         "request_batch_wait_time": 0.1
       }
@@ -66,6 +67,11 @@ send in each request is set in the ``request_batch_size`` field, while the numbe
 of seconds to wait between requests is set in the ``request_batch_wait_time`` field.
 The batch size has a maximum of 50 (also the default), and the wait time defaults to
 0.1 seconds.
+
+The transport makes use of Redis to queue requests before sending them. If you'd like
+to customize your Redis settings (eg. the port number), pass your desired configuration
+as a JSON object in the ``redis_manager`` field. Passing an empty object causes the
+transport to use the default configuration.
 
 Post the config to Junebug to start the channel::
 
