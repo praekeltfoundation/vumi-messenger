@@ -1,6 +1,7 @@
 import json
 from datetime import datetime
 from urllib import urlencode
+from urlparse import urlsplit, urlunsplit
 
 import treq
 from confmodel.fallbacks import SingleFieldFallback
@@ -183,8 +184,10 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
-        self.BATCH_API_URL = self.config.get('outbound_url',
-                                             'https://graph.facebook.com')
+
+        self.outbound_url = self.config.get('outbound_url')
+        scheme, domain, path, query, fragment = urlsplit(self.outbound_url)
+        self.BATCH_API_URL = urlunsplit([scheme, domain, '', '', ''])
 
         static_config = self.get_static_config()
         self.batch_size = static_config.request_batch_size
