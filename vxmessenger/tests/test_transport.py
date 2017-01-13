@@ -67,7 +67,7 @@ class TestMessengerTransport(VumiTestCase):
             'web_port': 0,
             'web_path': '/api',
             'publish_status': True,
-            'outbound_url': 'https://graph.facebook.com',
+            'outbound_url': 'https://graph.facebook.com/v2.8/me/messages',
             'username': 'root',
             'password': 't00r',
         }
@@ -623,7 +623,7 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(data['batch'], json.dumps([
             {
                 'method': 'POST',
-                'relative_url': 'v2.6/me/messages',
+                'relative_url': 'v2.8/me/messages',
                 'body': urlencode({
                     'message': {'text': u'hi'},
                     'recipient': {'id': u'+123'},

@@ -188,6 +188,7 @@ class MessengerTransport(HttpRpcTransport):
         self.outbound_url = self.config.get('outbound_url')
         scheme, domain, path, query, fragment = urlsplit(self.outbound_url)
         self.BATCH_API_URL = urlunsplit([scheme, domain, '', '', ''])
+        self.MESSAGES_API_PATH = path.lstrip('/')
 
         static_config = self.get_static_config()
         self.batch_size = static_config.request_batch_size
@@ -620,7 +621,7 @@ class MessengerTransport(HttpRpcTransport):
         request = {
             'message_id': message['message_id'],
             'method': 'POST',
-            'relative_url': 'v2.6/me/messages',
+            'relative_url': self.MESSAGES_API_PATH,
             'body': urlencode(reply),
         }
         yield self.add_request(request)
