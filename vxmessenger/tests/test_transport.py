@@ -1,20 +1,19 @@
 import json
+from urllib import urlencode
 
-from vumi.tests.helpers import VumiTestCase
-from vumi.tests.utils import MockHttpServer
-
+import treq
 from twisted.internet import reactor
-from twisted.internet.defer import (
-    inlineCallbacks, returnValue, DeferredQueue, Deferred)
+from twisted.internet.defer import (inlineCallbacks, returnValue,
+                                    DeferredQueue, Deferred)
 from twisted.internet.task import Clock
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vxmessenger.transport import MessengerTransport, UnsupportedMessage
+from vumi.tests.helpers import VumiTestCase, MessageHelper
+from vumi.tests.utils import LogCatcher, MockHttpServer
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
-from vumi.tests.helpers import MessageHelper
 
-import treq
+from vxmessenger.transport import MessengerTransport, UnsupportedMessage
 
 
 class DummyResponse(object):
@@ -68,7 +67,7 @@ class TestMessengerTransport(VumiTestCase):
             'web_port': 0,
             'web_path': '/api',
             'publish_status': True,
-            'outbound_url': self.remote_server.url,
+            'outbound_url': 'https://graph.facebook.com/v2.8/me/messages',
             'username': 'root',
             'password': 't00r',
         }
@@ -77,6 +76,124 @@ class TestMessengerTransport(VumiTestCase):
         transport = yield self.tx_helper.get_transport(config)
         transport.clock = self.clock
         returnValue(transport)
+
+    @inlineCallbacks
+    def test_add_request(self):
+        transport = yield self.mk_transport()
+        request = {'foo': 'bar'}
+        yield transport.add_request(request)
+
+        self.assertEqual(transport.queue_len, 1)
+
+    @inlineCallbacks
+    def test_request_loop_errback(self):
+        transport = yield self.mk_transport()
+        transport._request_loop.stop()
+
+        def _raise_error():
+            raise Exception('This is an error!')
+
+        transport._request_loop.f = _raise_error
+        with LogCatcher(message='request_loop') as lc:
+            transport._start_request_loop(transport._request_loop)
+            self.assertFalse(transport._request_loop.running)
+            logs = set(lc.messages())
+
+        transport._request_loop.f = transport.dispatch_requests
+        transport._start_request_loop(transport._request_loop)
+
+        self.assertTrue(transport._request_loop.running)
+        self.assertEqual(logs, {
+            'Error in request_loop: This is an error!',
+            'Restarting request_loop...',
+        })
+
+    @inlineCallbacks
+    def test_batch_error_no_json(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [{'message_id': '1'}]
+
+        yield transport.handle_batch_error(DummyResponse(400, 'fail'))
+        yield self.assert_outbound_failure('1', 'Batch request failed (400)',
+                                           'batch_request_fail')
+
+    @inlineCallbacks
+    def test_batch_error_with_json(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [{'message_id': '1'}]
+
+        yield transport.handle_batch_error(DummyResponse(400, json.dumps({
+            'this': 'is',
+            'nonsense': 'json',
+        })))
+        yield self.assert_outbound_failure('1', 'Batch request failed (400)',
+                                           'batch_request_fail')
+
+    @inlineCallbacks
+    def test_dispatch_requests(self):
+        transport = yield self.mk_transport(access_token='access-token')
+        requests = [
+            {
+                'message_id': '123',
+                'method': 'POST',
+                'relative_url': 'foo',
+                'body': {'param': 'value'},
+            },
+            {
+                'message_id': '456',
+                'method': 'GET',
+                'relative_url': 'bar',
+                'body': '',
+            },
+        ]
+        batch = []
+        for i, req in enumerate(requests):
+            batch.append(req)
+            del batch[i]['message_id']
+            yield transport.add_request(req)
+
+        d = transport.dispatch_requests()
+        request_d, args, kwargs = yield transport.request_queue.get()
+        request_d.callback(DummyResponse(200, json.dumps({})))
+
+        method, url, data = args
+        self.assertEqual(method, 'POST')
+        self.assertEqual(url, 'https://graph.facebook.com')
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'access-token')
+        self.assertEqual(json.loads(data['batch']), batch)
+
+        yield d
+
+    @inlineCallbacks
+    def test_handle_batch_response_all_types(self):
+        transport = yield self.mk_transport()
+        transport.pending_requests = [
+            {'message_id': '1'}, {'message_id': '2'}, {'message_id': '3'},
+        ]
+        response = DummyResponse(200, json.dumps([
+            {
+                'code': 200,
+                'body': {
+                    'message_id': '123',
+                },
+            },
+            {
+                'code': 400,
+                'body': json.dumps({'error': {
+                    'code': 400,
+                    'message': 'bad request',
+                }}),
+            },
+            None,   # the request could not be completed or timed out
+        ]))
+
+        yield transport.handle_batch_response(response)
+        self.assertEqual(transport.pending_requests, [])
+
+        request = yield transport.redis.lpop('request_queue')
+        self.assertEqual(request, json.dumps({'message_id': '3'}))
 
     @inlineCallbacks
     def test_hub_challenge(self):
@@ -491,7 +608,7 @@ class TestMessengerTransport(VumiTestCase):
         })
 
     @inlineCallbacks
-    def test_outbound(self):
+    def test_good_outbound(self):
         transport = yield self.mk_transport(access_token='access_token')
 
         d = self.tx_helper.make_dispatch_outbound(
@@ -501,30 +618,97 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
-        self.assertEqual(json.loads(data), {
-            'message': {
-                'text': 'hi',
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'access_token')
+        self.assertEqual(data['batch'], json.dumps([
+            {
+                'method': 'POST',
+                'relative_url': 'v2.8/me/messages',
+                'body': urlencode({
+                    'message': {'text': u'hi'},
+                    'recipient': {'id': u'+123'},
+                }),
             },
-            'recipient': {
-                'id': '+123',
-            }
-        })
-        request_d.callback(DummyResponse(200, json.dumps({
-            'message_id': 'the-message-id'
-        })))
+        ]))
+        request_d.callback(DummyResponse(200, json.dumps([
+            {
+                'code': 200,
+                'body': {
+                    'message_id': 'the-message-id',
+                },
+            },
+        ])))
 
         msg = yield d
-        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        yield self.assert_outbound_success(msg['message_id'], 'the-message-id')
 
-        self.assertEqual(ack['user_message_id'], msg['message_id'])
-        self.assertEqual(ack['sent_message_id'], 'the-message-id')
+    @inlineCallbacks
+    def test_bad_outbound(self):
+        transport = yield self.mk_transport(access_token='access_token',
+                                            request_batch_wait_time=0.00001)
+
+        d = self.tx_helper.make_dispatch_outbound(
+            from_addr='456',
+            to_addr='+123',
+            content='bye')
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        # We send a 200 response because we only want to emulate a single
+        # request failing - the batch request should succeed
+        request_d.callback(DummyResponse(200, json.dumps([
+            {
+                'code': 401,
+                'body': json.dumps({
+                    'error': {
+                        'code': 10,
+                        'message': 'not authourized'
+                    },
+                }),
+            },
+        ])))
+
+        msg = yield d
+        yield self.assert_outbound_failure(
+            msg['message_id'], 'not authourized',
+            'application_does_not_have_permissions')
+
+    @inlineCallbacks
+    def test_handle_outbound_success(self):
+        transport = yield self.mk_transport()
+        yield transport.handle_outbound_success('1', '2')
+        yield self.assert_outbound_success('1', '2')
+
+    @inlineCallbacks
+    def test_handle_outbound_failure(self):
+        transport = yield self.mk_transport()
+        yield transport.handle_outbound_failure('1', 'fail', 'status')
+        yield self.assert_outbound_failure('1', 'fail', 'status')
+
+    @inlineCallbacks
+    def assert_outbound_success(self, user_message_id, sent_message_id):
+        [ack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(ack['user_message_id'], user_message_id)
+        self.assertEqual(ack['sent_message_id'], sent_message_id)
 
         [status] = self.tx_helper.get_dispatched_statuses()
-
         self.assertEqual(status['status'], 'ok')
         self.assertEqual(status['component'], 'outbound')
         self.assertEqual(status['type'], 'request_success')
         self.assertEqual(status['message'], 'Request successful')
+
+    @inlineCallbacks
+    def assert_outbound_failure(self, message_id, reason, status_type):
+        [nack] = yield self.tx_helper.wait_for_dispatched_events(1)
+        self.assertEqual(nack['user_message_id'], message_id)
+        self.assertEqual(nack['sent_message_id'], message_id)
+
+        [status] = self.tx_helper.get_dispatched_statuses()
+        self.assertEqual(status['status'], 'down')
+        self.assertEqual(status['component'], 'outbound')
+        self.assertEqual(status['type'], status_type)
+        self.assertEqual(status['message'], reason)
 
     @inlineCallbacks
     def test_construct_plain_reply(self):

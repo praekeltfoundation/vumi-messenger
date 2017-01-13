@@ -1,18 +1,19 @@
 import json
 from datetime import datetime
 from urllib import urlencode
+from urlparse import urlsplit, urlunsplit
 
 import treq
-
-
 from confmodel.fallbacks import SingleFieldFallback
 from twisted.internet import reactor
-from twisted.internet.defer import inlineCallbacks, returnValue
-from twisted.internet.error import TimeoutError
+from twisted.internet.defer import inlineCallbacks, returnValue, DeferredLock
+from twisted.internet.task import LoopingCall
 from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
-from vumi.config import ConfigText, ConfigDict, ConfigBool
+from vumi.config import (ConfigText, ConfigDict, ConfigBool, ConfigInt,
+                         ConfigFloat)
+from vumi.persist.txredis_manager import TxRedisManager
 from vumi.transports.httprpc import HttpRpcTransport
 
 
@@ -23,8 +24,7 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
         required=True)
     page_id = ConfigText(
         "The page id for the Messenger API",
-        required=False,
-        fallbacks=[SingleFieldFallback("app_id")])
+        required=False, fallbacks=[SingleFieldFallback("app_id")])
     app_id = ConfigText(
         "DEPRECATED The page app id for the Messenger API",
         required=False)
@@ -35,6 +35,15 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
     retrieve_profile = ConfigBool(
         "Set to true to include the user profile details in "
         "the helper_metadata", required=False, default=False)
+    request_batch_size = ConfigInt(
+        "The maximum number of requests to send using using batch API calls",
+        required=False, default=50, static=True)
+    request_batch_wait_time = ConfigFloat(
+        "The time to wait between batch API calls (in seconds)",
+        required=False, default=0.1, static=True)
+    redis_manager = ConfigDict(
+        "Parameters to connect to Redis with",
+        required=False, default={}, static=True)
 
 
 class Page(object):
@@ -175,6 +184,19 @@ class MessengerTransport(HttpRpcTransport):
     def setup_transport(self):
         yield super(MessengerTransport, self).setup_transport()
         self.pool = HTTPConnectionPool(self.clock, persistent=False)
+
+        self.outbound_url = self.config.get('outbound_url')
+        scheme, domain, path, query, fragment = urlsplit(self.outbound_url)
+        self.BATCH_API_URL = urlunsplit([scheme, domain, '', '', ''])
+        self.MESSAGES_API_PATH = path.lstrip('/')
+
+        static_config = self.get_static_config()
+        self.batch_size = static_config.request_batch_size
+        self.batch_time = static_config.request_batch_wait_time
+
+        self.redis = yield TxRedisManager.from_config(
+            static_config.redis_manager)
+
         if self.config.get('welcome_message'):
             if not self.config.get('page_id'):
                 self.log.error('page_id is required for welcome_message')
@@ -187,12 +209,131 @@ class MessengerTransport(HttpRpcTransport):
             except (MessengerTransport,), e:
                 self.log.error('Failed to setup welcome message: %s' % (e,))
 
+        self.queue_len = 0
+        self.pending_requests = []
+        self._lock = DeferredLock()
+        self._request_loop = LoopingCall(self.dispatch_requests)
+        self._start_request_loop(self._request_loop)
+
     @inlineCallbacks
     def teardown_transport(self):
         if hasattr(self, 'web_resource'):
             yield self.web_resource.loseConnection()
             if self.request_gc.running:
                 self.request_gc.stop()
+        if self._request_loop.running:
+            self._request_loop.stop()
+
+    def _start_request_loop(self, loop):
+        if not loop.running:
+            loop.start(self.batch_time).addErrback(self._request_loop_error)
+
+    def _request_loop_error(self, failure):
+        self.log.info('Error in request_loop: %s' % failure.value)
+        self.log.info('Restarting request_loop...')
+        self._start_request_loop(self._request_loop)
+
+    @inlineCallbacks
+    def add_request(self, request):
+        req_string = json.dumps(request)
+        self.queue_len = yield self.redis.rpush('request_queue', req_string)
+
+    @inlineCallbacks
+    def dispatch_requests(self):
+        yield self._lock.acquire()
+        try:
+            yield self._dispatch_requests()
+        finally:
+            yield self._lock.release()
+
+    @inlineCallbacks
+    def _dispatch_requests(self):
+        batch_size = (self.batch_size if self.batch_size <= self.queue_len
+                      else self.queue_len)
+        if batch_size == 0:
+            return
+
+        data = {
+            'access_token': self.config['access_token'],
+            'include_headers': False,
+            'batch': [],
+        }
+        for i in range(0, batch_size):
+            req_string = yield self.redis.lpop('request_queue')
+            if req_string is None:
+                continue
+            request = json.loads(req_string)
+            self.pending_requests.append(request)
+            data['batch'].append({
+                'method': request['method'],
+                'relative_url': request['relative_url'],
+                'body': request.get('body', ''),
+            })
+
+        data['batch'] = json.dumps(data['batch'])
+        response = yield self.request('POST', self.BATCH_API_URL, data,
+                                      pool=self.pool)
+        if response.code == http.OK:
+            yield self.handle_batch_response(response)
+        else:
+            yield self.handle_batch_error(response)
+
+    @inlineCallbacks
+    def handle_batch_response(self, response):
+        content = yield response.json()
+        for i, res in enumerate(content):
+            req = self.pending_requests[i]
+            if res is None:
+                # Request was not completed, add to queue again
+                yield self.add_request(req)
+            elif res.get('code') == http.OK:
+                yield self.handle_outbound_success(
+                    req['message_id'], res['body']['message_id'])
+            else:
+                body = json.loads(res['body'])
+                fail_type = self.SEND_FAIL_TYPES.get(
+                    body['error']['code'], 'request_fail_unknown')
+                yield self.handle_outbound_failure(
+                    req['message_id'], body['error']['message'], fail_type)
+
+        self.pending_requests = []
+
+    @inlineCallbacks
+    def handle_batch_error(self, response):
+        # It's possible that some requests might still have been completed
+        try:
+            yield self.handle_batch_response(response)
+        except (ValueError, KeyError, AttributeError):
+            pass
+
+        code = response.code
+        for req in self.pending_requests:
+            yield self.handle_outbound_failure(
+                req['message_id'], 'Batch request failed (%s)' % code,
+                'batch_request_fail')
+
+    @inlineCallbacks
+    def handle_outbound_success(self, user_message_id, sent_message_id):
+        yield self.publish_ack(
+            user_message_id=user_message_id,
+            sent_message_id=sent_message_id)
+        yield self.add_status(
+            component='outbound',
+            status='ok',
+            type='request_success',
+            message='Request successful')
+
+    @inlineCallbacks
+    def handle_outbound_failure(self, message_id, reason, status_type):
+        yield self.publish_nack(
+            user_message_id=message_id,
+            sent_message_id=message_id,
+            reason=reason)
+        yield self.add_status(
+            component='outbound',
+            status='down',
+            type=status_type,
+            message=reason)
 
     @inlineCallbacks
     def setup_welcome_message(self, welcome_message_payload, page_id):
@@ -560,48 +701,14 @@ class MessengerTransport(HttpRpcTransport):
         self.log.info("MessengerTransport outbound %r" % (message,))
         reply = self.construct_reply(message)
         self.log.info("Reply: %s" % (reply,))
-        try:
-            resp = yield self.request(
-                method='POST',
-                url='%s?access_token=%s' % (self.config['outbound_url'],
-                                            self.config['access_token']),
-                data=json.dumps(reply, separators=(',', ':')),
-                headers={
-                    'Content-Type': 'application/json',
-                },
-                pool=self.pool)
 
-            data = yield resp.json()
-            self.log.info('API reply: %s' % (data,))
-
-            if resp.code == http.OK:
-                yield self.publish_ack(
-                    user_message_id=message['message_id'],
-                    sent_message_id=data['message_id'])
-                yield self.add_status(
-                    component='outbound',
-                    status='ok',
-                    type='request_success',
-                    message='Request successful')
-            else:
-                yield self.nack(
-                    message, data['error']['message'],
-                    self.SEND_FAIL_TYPES.get(
-                        data['error']['code'], 'request_fail_unknown'))
-        except (TimeoutError,), e:
-            yield self.nack(message, e, 'request_fail_unknown')
-
-    @inlineCallbacks
-    def nack(self, message, reason, status_type):
-        yield self.publish_nack(
-            user_message_id=message['message_id'],
-            sent_message_id=message['message_id'],
-            reason=reason)
-        yield self.add_status(
-            component='outbound',
-            status='down',
-            type=status_type,
-            message=reason)
+        request = {
+            'message_id': message['message_id'],
+            'method': 'POST',
+            'relative_url': self.MESSAGES_API_PATH,
+            'body': urlencode(reply),
+        }
+        yield self.add_request(request)
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
