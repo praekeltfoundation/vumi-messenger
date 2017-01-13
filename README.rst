@@ -54,11 +54,20 @@ save it as a file called ``config.json``:
         "page_id": "YOUR_FB_PAGE_ID",
         "retrieve_profile": false,
         "outbound_url": "https://graph.facebook.com/v2.6/me/messages",
-        "access_token": "YOUR_FB_ACCESS_TOKEN"
+        "access_token": "YOUR_FB_ACCESS_TOKEN",
+        "request_batch_size": 50,
+        "request_batch_wait_time": 0.1
       }
     }
 
-Post it to Junebug to start the channel::
+The Messenger transport makes use of Facebook's Batch API, passing instructions
+for multiple operations in a single HTTP request. The number of operations to
+send in each request is set in the ``request_batch_size`` field, while the number
+of seconds to wait between requests is set in the ``request_batch_wait_time`` field.
+The batch size has a maximum of 50 (also the default), and the wait time defaults to
+0.1 seconds.
+
+Post the config to Junebug to start the channel::
 
     $ curl -X POST -d@config.json http://localhost:8000/channels/
 
@@ -308,12 +317,12 @@ Contains a dict ``messenger`` with the following keys:
 
 ``mid``:
     Messenger message id.
-    
+
 ``attachments``:
     List containing dictionaries as such:
-    
+
     .. code-block:: json
-    
+
         {
             "type":"image",
             "payload": {
@@ -325,7 +334,7 @@ Contains a dict ``messenger`` with the following keys:
     Dict containing a ``ref`` key, which is the PASS_THROUGH_PARAM as defined by:
 
     https://developers.facebook.com/docs/messenger-platform/plugin-reference#send_to_messenger
- 
+
 Other items defined in ``payload``:
     e.g. ``"anything_extra": "Bonus"``
 
@@ -336,7 +345,7 @@ Contains a dict ``messenger`` with the same data as ``transport_metadata`` and t
 Note: only if ``retrieve_profile`` is configured as ``true``
 
 .. code-block:: json
-    
+
     {
         "first_name": "Firstname",
         "last_name": "Lastname",
@@ -348,7 +357,7 @@ Supported webhooks
 
 ``messages``:
     Standard conversational messages & attachments.
-    
+
 ``messaging_postbacks``:
     Postback buttons.
 
