@@ -608,6 +608,39 @@ class TestMessengerTransport(VumiTestCase):
         })
 
     @inlineCallbacks
+    def test_sender_action(self):
+        transport = yield self.mk_transport(access_token='access_token')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            from_addr='456',
+            to_addr='+123',
+            content=None,
+            helper_metadata={'messenger': {'sender_action': 'typing_on'}})
+
+        (request_d, args, kwargs) = yield transport.request_queue.get()
+        method, url, data = args
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'access_token')
+        self.assertEqual(data['batch'], json.dumps([
+            {
+                'method': 'POST',
+                'relative_url': 'v2.8/me/messages',
+                'body': urlencode({
+                    'recipient': {'id': u'+123'},
+                    'sender_action': 'typing_on',
+                }),
+            },
+        ]))
+        request_d.callback(DummyResponse(200, json.dumps([
+            {
+                'code': 200,
+                'body': {'recipient_id': 'the-recipient-id'},
+            },
+        ])))
+
+        msg = yield d
+
+    @inlineCallbacks
     def test_good_outbound(self):
         transport = yield self.mk_transport(access_token='access_token')
 

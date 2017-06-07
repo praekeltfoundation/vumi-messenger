@@ -287,6 +287,9 @@ class MessengerTransport(HttpRpcTransport):
                 # Request was not completed, add to queue again
                 yield self.add_request(req)
             elif res.get('code') == http.OK:
+                if res['body'].get('message_id') is None:
+                    # TODO: acknowledge success of non-message requests
+                    continue
                 yield self.handle_outbound_success(
                     req['message_id'], res['body']['message_id'])
             else:
@@ -461,6 +464,14 @@ class MessengerTransport(HttpRpcTransport):
         media = messenger_metadata.get('media', {})
         if media.get('type', '') in {'audio', 'video', 'image', 'file'}:
             return self.construct_media_reply(message)
+
+        SENDER_ACTIONS = {'typing_on', 'typing_off', 'mark_seen'}
+        # NOTE: invalid sender actions are sent as blank messages (no effect)
+        if messenger_metadata.get('sender_action') in SENDER_ACTIONS:
+            return {
+                'recipient': {'id': message['to_addr']},
+                'sender_action': messenger_metadata['sender_action']
+            }
 
         return self.construct_plain_reply(message)
 
