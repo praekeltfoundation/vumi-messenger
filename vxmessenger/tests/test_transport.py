@@ -780,6 +780,21 @@ class TestMessengerTransport(VumiTestCase):
                         'type': 'phone_number',
                         'title': 'Venus',
                         'payload': '+271234567',
+                    }, {
+                        'type': 'element_share',
+                        'share_contents': {
+                            # Must be a generic template
+                            'attachment': {
+                                'type': 'template',
+                                'payload': {
+                                    'template_type': 'generic',
+                                    'elements': [
+                                        {'title': 'element_1'},
+                                        {'title': 'element_2'},
+                                    ]
+                                }
+                            }
+                        }
                     }]
                 }
             })
@@ -796,6 +811,7 @@ class TestMessengerTransport(VumiTestCase):
                         'payload': {
                             'template_type': 'button',
                             'text': 'hello world',
+                            'sharable': True,
                             'buttons': [
                                 {
                                     'type': 'postback',
@@ -811,6 +827,22 @@ class TestMessengerTransport(VumiTestCase):
                                     'type': 'phone_number',
                                     'title': 'Venus',
                                     'payload': '+271234567',
+                                },
+                                {
+                                    'type': 'element_share',
+                                    'share_contents': {
+                                        # Must be a generic template
+                                        'attachment': {
+                                            'type': 'template',
+                                            'payload': {
+                                                'template_type': 'generic',
+                                                'elements': [
+                                                    {'title': 'element_1'},
+                                                    {'title': 'element_2'},
+                                                ]
+                                            }
+                                        }
+                                    }
                                 }
                             ]
                         }

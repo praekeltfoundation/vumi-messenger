@@ -478,7 +478,10 @@ class MessengerTransport(HttpRpcTransport):
     def construct_button(self, btn):
         typ = btn.get('type', 'postback')
         if typ == 'element_share':
-            return {'type': 'element_share'}
+            share_btn = {'type': 'element_share'}
+            if 'share_contents' in btn:
+                share_btn['share_contents'] = btn['share_contents']
+            return share_btn
         ret = {
             'type': typ,
             'title': btn['title'],
@@ -489,10 +492,12 @@ class MessengerTransport(HttpRpcTransport):
             ret['url'] = btn['url']
             if 'webview_height_ratio' in btn:
                 ret['webview_height_ratio'] = btn['webview_height_ratio']
-                if 'messenger_extensions' in btn:
-                    ret['messenger_extensions'] = btn['messenger_extensions']
+            if 'messenger_extensions' in btn:
+                ret['messenger_extensions'] = btn['messenger_extensions']
                 if 'fallback_url' in btn:
                     ret['fallback_url'] = btn['fallback_url']
+            if 'webview_share_button' in btn:
+                ret['webview_share_button'] = btn['webview_share_button']
         elif typ == 'phone_number':
             ret['payload'] = btn['payload']
         else:
@@ -510,6 +515,7 @@ class MessengerTransport(HttpRpcTransport):
                     'type': 'template',
                     'payload': {
                         'template_type': 'button',
+                        'sharable': button.get('sharable', True),
                         'text': button['text'],
                         'buttons': [self.construct_button(btn)
                                     for btn in button['buttons']]
