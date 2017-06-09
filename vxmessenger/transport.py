@@ -466,34 +466,38 @@ class MessengerTransport(HttpRpcTransport):
             returnValue({})
 
     def construct_reply(self, message):
-        helper_metadata = message.get('helper_metadata', {})
-        messenger_metadata = helper_metadata.get('messenger', {})
-
-        template_type = messenger_metadata.get('template_type')
-        if template_type == 'button':
-            return self.construct_button_reply(message)
-        if template_type == 'generic':
-            return self.construct_generic_reply(message)
-        if template_type == 'list':
-            return self.construct_list_reply(message)
-        if template_type == 'quick':
-            return self.construct_quick_reply(message)
-        if template_type == 'receipt':
-            return self.construct_receipt_reply(message)
-
-        media = messenger_metadata.get('media', {})
-        if media.get('type', '') in {'audio', 'video', 'image', 'file'}:
-            return self.construct_media_reply(message)
+        meta = message.get('helper_metadata', {}).get('messenger', {})
 
         SENDER_ACTIONS = {'typing_on', 'typing_off', 'mark_seen'}
-        # NOTE: invalid sender actions are sent as blank messages (no effect)
-        if messenger_metadata.get('sender_action') in SENDER_ACTIONS:
+        if meta.get('sender_action') in SENDER_ACTIONS:
             return {
                 'recipient': {'id': message['to_addr']},
-                'sender_action': messenger_metadata['sender_action']
+                'sender_action': meta['sender_action']
             }
 
-        return self.construct_plain_reply(message)
+        template_type = meta.get('template_type')
+        reply = {}
+        media = meta.get('media', {})
+
+        # TODO: handle media messages properly
+        if template_type == 'button':
+            reply = self.construct_button_reply(message)
+        elif template_type == 'generic':
+            reply = self.construct_generic_reply(message)
+        elif template_type == 'list':
+            reply = self.construct_list_reply(message)
+        elif template_type == 'receipt':
+            reply = self.construct_receipt_reply(message)
+        elif media.get('type', '') in {'audio', 'video', 'image', 'file'}:
+            reply = self.construct_media_reply(message)
+        else:
+            reply = self.construct_plain_reply(message)
+
+        if meta.get('quick_replies') is not None:
+            reply['message']['quick_replies'] = [
+                self.construct_quick_button(btn)
+                for btn in meta['quick_replies']]
+        return reply
 
     def construct_button(self, btn):
         typ = btn.get('type', 'postback')
@@ -695,7 +699,7 @@ class MessengerTransport(HttpRpcTransport):
         }
 
     def construct_quick_button(self, btn):
-        typ = btn.get('type', 'text')
+        typ = btn.get('content_type', 'text')
         ret = {
             'content_type': typ
         }
@@ -709,19 +713,6 @@ class MessengerTransport(HttpRpcTransport):
         else:
             raise UnsupportedMessage('Unknown quick reply type "%s"' % typ)
         return ret
-
-    def construct_quick_reply(self, message):
-        button = message['helper_metadata']['messenger']
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'text': button['text'],
-                'quick_replies': [self.construct_quick_button(btn)
-                                  for btn in button['quick_replies']]
-            }
-        }
 
     def construct_plain_reply(self, message):
         return {
