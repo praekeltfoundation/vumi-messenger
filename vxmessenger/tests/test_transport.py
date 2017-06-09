@@ -420,6 +420,50 @@ class TestMessengerTransport(VumiTestCase):
         })
 
     @inlineCallbacks
+    def test_inbound_referral(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                'object': 'page',
+                'entry': [{
+                    'id': 'PAGE_ID',
+                    'time': 1457764198246,
+                    'messaging': [{
+                        'sender': {'id': 'USER_ID'},
+                        'recipient': {'id': 'PAGE_ID'},
+                        'timestamp': 1457764198246,
+                        'referral': {
+                            'ref': 'REFERRAL_DATA',
+                            'ad_id': '123',
+                            'source': 'ADS',
+                            # This field appears in all referral types it seems
+                            'type': 'OPEN_THREAD',
+                        },
+                    }],
+                }],
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                'ref': 'REFERRAL_DATA',
+                'ad_id': '123',
+                'source': 'ADS',
+            },
+        })
+
+    @inlineCallbacks
     def test_inbound_optin(self):
         yield self.mk_transport()
 

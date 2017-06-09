@@ -155,6 +155,22 @@ class Page(object):
                         extra=payload,
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
+                elif 'referral' in msg:
+                    source = msg['referral']['source']
+                    extra = {
+                        'source': source,
+                        'ref': msg['referral'].get('ref'),
+                    }
+                    if source == 'ADS':
+                        extra['ad_id'] = msg['referral'].get('ad_id')
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content='',
+                        extra=extra,
+                        timestamp=fb_timestamp(msg['timestamp'])
+                    ))
                 else:
                     errors.append('Not supporting: %s' % (msg,))
         return messages, errors
