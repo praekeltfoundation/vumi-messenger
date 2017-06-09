@@ -146,6 +146,8 @@ class Page(object):
                         del payload['in_reply_to']
                     except KeyError:
                         pass
+                    if 'referral' in msg['postback']:
+                        payload['referral'] = msg['postback']['referral']
                     messages.append(cls(
                         to_addr=msg['recipient']['id'],
                         from_addr=msg['sender']['id'],
@@ -158,11 +160,13 @@ class Page(object):
                 elif 'referral' in msg:
                     source = msg['referral']['source']
                     extra = {
-                        'source': source,
-                        'ref': msg['referral'].get('ref'),
+                        'referral': {
+                            'source': source,
+                            'ref': msg['referral'].get('ref'),
+                        }
                     }
                     if source == 'ADS':
-                        extra['ad_id'] = msg['referral'].get('ad_id')
+                        extra['referral']['ad_id'] = msg['referral']['ad_id']
                     messages.append(cls(
                         to_addr=msg['recipient']['id'],
                         from_addr=msg['sender']['id'],

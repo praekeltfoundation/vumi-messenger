@@ -457,9 +457,11 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(msg['transport_metadata'], {
             'messenger': {
                 'mid': None,
-                'ref': 'REFERRAL_DATA',
-                'ad_id': '123',
-                'source': 'ADS',
+                'referral': {
+                    'ref': 'REFERRAL_DATA',
+                    'ad_id': '123',
+                    'source': 'ADS',
+                },
             },
         })
 
@@ -530,7 +532,12 @@ class TestMessengerTransport(VumiTestCase):
                             "payload": json.dumps({
                                 "content": "1",
                                 "in_reply_to": "12345",
-                            })
+                            }),
+                            "referral": {
+                                "ref": "REFERRAL_DATA",
+                                "source": "SHORTLINK",
+                                "type": "OPEN_THREAD",
+                            }
                         }
                     }]
                 }]
@@ -548,7 +555,12 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(msg['in_reply_to'], '12345')
         self.assertEqual(msg['transport_metadata'], {
             'messenger': {
-                'mid': None
+                'mid': None,
+                'referral': {
+                    'ref': 'REFERRAL_DATA',
+                    'source': 'SHORTLINK',
+                    'type': 'OPEN_THREAD',
+                }
             }
         })
 
