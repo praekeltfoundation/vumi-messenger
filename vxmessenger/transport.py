@@ -146,8 +146,6 @@ class Page(object):
                         del payload['in_reply_to']
                     except KeyError:
                         pass
-                    if 'referral' in msg['postback']:
-                        payload['referral'] = msg['postback']['referral']
                     messages.append(cls(
                         to_addr=msg['recipient']['id'],
                         from_addr=msg['sender']['id'],
@@ -157,6 +155,16 @@ class Page(object):
                         extra=payload,
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
+                    if 'referral' in msg['postback']:
+                        messages.append(cls(
+                            to_addr=msg['recipient']['id'],
+                            from_addr=msg['sender']['id'],
+                            mid=None,
+                            content='',
+                            in_reply_to=None,
+                            extra={'referral': msg['postback']['referral']},
+                            timestamp=fb_timestamp(msg['timestamp'])
+                        ))
                 elif 'referral' in msg:
                     source = msg['referral']['source']
                     extra = {

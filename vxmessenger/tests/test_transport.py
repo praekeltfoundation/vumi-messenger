@@ -614,12 +614,7 @@ class TestMessengerTransport(VumiTestCase):
                             "payload": json.dumps({
                                 "content": "1",
                                 "in_reply_to": "12345",
-                            }),
-                            "referral": {
-                                "ref": "REFERRAL_DATA",
-                                "source": "SHORTLINK",
-                                "type": "OPEN_THREAD",
-                            }
+                            })
                         }
                     }]
                 }]
@@ -638,12 +633,62 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(msg['transport_metadata'], {
             'messenger': {
                 'mid': None,
+            }
+        })
+
+    @inlineCallbacks
+    def test_inbound_postback_with_referral(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                'object': 'page',
+                'entry': [{
+                    'id': 'PAGE_ID',
+                    'time': 1457764198246,
+                    'messaging': [{
+                        'sender': {'id': 'USER_ID'},
+                        'recipient': {'id': 'PAGE_ID'},
+                        'timestamp': 1457764198246,
+                        'postback': {
+                            'payload': json.dumps({"payload": "here"}),
+                            'referral': {
+                                'ref': 'REFERRAL_DATA',
+                                'source': 'SHORTLINK',
+                                'type': 'OPEN_THREAD',
+                            },
+                        },
+                    }],
+                }],
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        postback, ref = yield self.tx_helper.wait_for_dispatched_inbound(2)
+
+        self.assertEqual(postback['from_addr'], 'USER_ID')
+        self.assertEqual(postback['to_addr'], 'PAGE_ID')
+        self.assertEqual(postback['content'], '')
+        self.assertEqual(postback['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                "payload": "here",
+            },
+        })
+
+        self.assertEqual(ref['from_addr'], 'USER_ID')
+        self.assertEqual(ref['to_addr'], 'PAGE_ID')
+        self.assertEqual(ref['content'], '')
+        self.assertEqual(ref['transport_metadata'], {
+            'messenger': {
+                'mid': None,
                 'referral': {
                     'ref': 'REFERRAL_DATA',
                     'source': 'SHORTLINK',
                     'type': 'OPEN_THREAD',
-                }
-            }
+                },
+            },
         })
 
     @inlineCallbacks
