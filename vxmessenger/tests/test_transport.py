@@ -466,6 +466,88 @@ class TestMessengerTransport(VumiTestCase):
         })
 
     @inlineCallbacks
+    def test_inbound_account_linking(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                'object': 'page',
+                'entry': [{
+                    'id': 'PAGE_ID',
+                    'time': 1457764198246,
+                    'messaging': [{
+                        'sender': {'id': 'USER_ID'},
+                        'recipient': {'id': 'PAGE_ID'},
+                        'timestamp': 1457764198246,
+                        'account_linking': {
+                            'status': 'linked',
+                            'authorization_code': 'AUTH_CODE',
+                        },
+                    }],
+                }],
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                'account_linking': {
+                    'status': 'linked',
+                    'authorization_code': 'AUTH_CODE',
+                },
+            },
+        })
+
+    @inlineCallbacks
+    def test_inbound_account_unlinking(self):
+        yield self.mk_transport()
+
+        res = yield self.tx_helper.mk_request_raw(
+            method='POST',
+            data=json.dumps({
+                'object': 'page',
+                'entry': [{
+                    'id': 'PAGE_ID',
+                    'time': 1457764198246,
+                    'messaging': [{
+                        'sender': {'id': 'USER_ID'},
+                        'recipient': {'id': 'PAGE_ID'},
+                        'timestamp': 1457764198246,
+                        'account_linking': {
+                            'status': 'unlinked',
+                        },
+                    }],
+                }],
+            }))
+
+        self.assertEqual(res.code, http.OK)
+
+        [msg] = yield self.tx_helper.wait_for_dispatched_inbound(1)
+
+        self.assertEqual(msg['from_addr'], 'USER_ID')
+        self.assertEqual(msg['to_addr'], 'PAGE_ID')
+        self.assertEqual(msg['from_addr_type'], 'facebook_messenger')
+        self.assertEqual(msg['provider'], 'facebook')
+        self.assertEqual(msg['content'], '')
+        self.assertEqual(msg['transport_metadata'], {
+            'messenger': {
+                'mid': None,
+                'account_linking': {
+                    'status': 'unlinked',
+                },
+            },
+        })
+
+    @inlineCallbacks
     def test_inbound_optin(self):
         yield self.mk_transport()
 
@@ -875,6 +957,11 @@ class TestMessengerTransport(VumiTestCase):
                                 }
                             }
                         }
+                    }, {
+                        'type': 'account_linking',
+                        'url': 'https://account.com',
+                    }, {
+                        'type': 'account_unlinking',
                     }]
                 }
             })
@@ -924,7 +1011,14 @@ class TestMessengerTransport(VumiTestCase):
                                             }
                                         }
                                     }
-                                }
+                                },
+                                {
+                                    'type': 'account_linking',
+                                    'url': 'https://account.com',
+                                },
+                                {
+                                    'type': 'account_unlinking',
+                                },
                             ]
                         }
                     }

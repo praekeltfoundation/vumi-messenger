@@ -175,6 +175,15 @@ class Page(object):
                         extra=extra,
                         timestamp=fb_timestamp(msg['timestamp'])
                     ))
+                elif 'account_linking' in msg:
+                    messages.append(cls(
+                        to_addr=msg['recipient']['id'],
+                        from_addr=msg['sender']['id'],
+                        mid=None,
+                        content='',
+                        extra={'account_linking': msg['account_linking']},
+                        timestamp=fb_timestamp(msg['timestamp']),
+                    ))
                 else:
                     errors.append('Not supporting: %s' % (msg,))
         return messages, errors
@@ -506,6 +515,13 @@ class MessengerTransport(HttpRpcTransport):
             if 'share_contents' in btn:
                 share_btn['share_contents'] = btn['share_contents']
             return share_btn
+        if typ == 'account_linking':
+            return {
+                'type': 'account_linking',
+                'url': btn['url'],
+            }
+        if typ == 'account_unlinking':
+            return {'type': 'account_unlinking'}
         ret = {
             'type': typ,
             'title': btn['title'],
