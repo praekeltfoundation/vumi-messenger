@@ -1,5 +1,4 @@
 import json
-from urllib import urlencode
 from urlparse import parse_qs
 
 import treq
@@ -14,7 +13,7 @@ from vumi.tests.helpers import VumiTestCase, MessageHelper
 from vumi.tests.utils import LogCatcher, MockHttpServer
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
 
-from vxmessenger.transport import MessengerTransport, UnsupportedMessage
+from vxmessenger.transport import MessengerTransport
 
 
 class DummyResponse(object):
@@ -821,7 +820,7 @@ class TestMessengerTransport(VumiTestCase):
             },
         ])))
 
-        msg = yield d
+        yield d
 
     @inlineCallbacks
     def test_good_outbound(self):
