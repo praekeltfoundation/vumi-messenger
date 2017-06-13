@@ -1,5 +1,6 @@
 import json
 from urllib import urlencode
+from urlparse import parse_qs
 
 import treq
 from twisted.internet import reactor
@@ -175,9 +176,9 @@ class TestMessengerTransport(VumiTestCase):
         response = DummyResponse(200, json.dumps([
             {
                 'code': 200,
-                'body': {
+                'body': json.dumps({
                     'message_id': '123',
-                },
+                }),
             },
             {
                 'code': 400,
@@ -802,18 +803,17 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
+
         self.assertFalse(data['include_headers'])
         self.assertEqual(data['access_token'], 'access_token')
-        self.assertEqual(data['batch'], json.dumps([
-            {
-                'method': 'POST',
-                'relative_url': 'v2.8/me/messages',
-                'body': urlencode({
-                    'recipient': {'id': u'+123'},
-                    'sender_action': 'typing_on',
-                }),
-            },
-        ]))
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        sender_action = req_body['sender_action'][0]
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(sender_action, 'typing_on')
+        self.assertEqual(recipient, {'id': '+123'})
+
         request_d.callback(DummyResponse(200, json.dumps([
             {
                 'code': 200,
@@ -836,22 +836,20 @@ class TestMessengerTransport(VumiTestCase):
         method, url, data = args
         self.assertFalse(data['include_headers'])
         self.assertEqual(data['access_token'], 'access_token')
-        self.assertEqual(data['batch'], json.dumps([
-            {
-                'method': 'POST',
-                'relative_url': 'v2.8/me/messages',
-                'body': urlencode({
-                    'message': {'text': u'hi'},
-                    'recipient': {'id': u'+123'},
-                }),
-            },
-        ]))
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {'text': 'hi'})
+        self.assertEqual(recipient, {'id': '+123'})
+
         request_d.callback(DummyResponse(200, json.dumps([
             {
                 'code': 200,
-                'body': {
+                'body': json.dumps({
                     'message_id': 'the-message-id',
-                },
+                }),
             },
         ])))
 
@@ -891,6 +889,435 @@ class TestMessengerTransport(VumiTestCase):
             'application_does_not_have_permissions')
 
     @inlineCallbacks
+    def test_outbound_text_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content='Hello, world!',
+            helper_metadata={'messenger': {
+                'quick_replies': [{
+                    'content_type': 'text',
+                    'title': 'OPTION',
+                    'payload': 'PAYLOAD',
+                }],
+                'notification_type': 'REGULAR',
+                'metadata': 'METADATA',
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'text': 'Hello, world!',
+            'metadata': 'METADATA',
+            'quick_replies': [{
+                'content_type': 'text',
+                'title': 'OPTION',
+                'payload': 'PAYLOAD',
+            }],
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({'message_id': 'MESSAGE_ID'}),
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
+    def test_outbound_media_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content=None,
+            helper_metadata={'messenger': {
+                'attachment': {
+                    'type': 'image',
+                    'payload': {
+                        'url': 'https://example.com/image.jpg',
+                        'is_reusable': True,
+                    }
+                }
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'], False)
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'attachment': {
+                'type': 'image',
+                'payload': {
+                    'url': 'https://example.com/image.jpg',
+                    'is_reusable': True,
+                },
+            },
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({
+                'message_id': 'MESSAGE_ID',
+                'attachment_id': 'ATTACHMENT_ID',
+            }),
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
+    def test_outbound_generic_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content='',
+            helper_metadata={'messenger': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'generic',
+                        'image_aspect_ratio': 'horizontal',
+                        'elements': [{
+                            'title': 'TITLE',
+                            'image_url': 'https://example.com/image.jpg',
+                            'default_action': {
+                                'type': 'web_url',
+                                'url': 'https://example.com/do_thing',
+                            },
+                            'buttons': [{
+                                'type': 'web_url',
+                                'title': 'Website',
+                                'url': 'https://example.com',
+                            }],
+                        }],
+                    },
+                },
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'generic',
+                    'image_aspect_ratio': 'horizontal',
+                    'elements': [{
+                        'title': 'TITLE',
+                        'image_url': 'https://example.com/image.jpg',
+                        'default_action': {
+                            'type': 'web_url',
+                            'url': 'https://example.com/do_thing',
+                        },
+                        'buttons': [{
+                            'type': 'web_url',
+                            'title': 'Website',
+                            'url': 'https://example.com',
+                        }],
+                    }],
+                },
+            },
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({'message_id': 'MESSAGE_ID'})
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
+    def test_outbound_list_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content=None,
+            helper_metadata={'messenger': {
+                'quick_replies': [{
+                    'content_type': 'location',
+                }],
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'list',
+                        'top_element_style': 'compact',
+                        'elements': [{
+                            'title': 'ELEMENT',
+                            'image_url': 'https://example.com/image.jpg',
+                            'default_action': {
+                                'type': 'web_url',
+                                'url': 'https://example.com',
+                            },
+                            'buttons': [{
+                                'type': 'postback',
+                                'title': 'Postback button',
+                                'payload': 'PAYLOAD',
+                            }],
+                        }],
+                        'buttons': [{
+                            'type': 'postback',
+                            'title': 'Postback button',
+                            'payload': 'PAYLOAD',
+                        }],
+                    },
+                },
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'list',
+                    'top_element_style': 'compact',
+                    'elements': [{
+                        'title': 'ELEMENT',
+                        'image_url': 'https://example.com/image.jpg',
+                        'default_action': {
+                            'type': 'web_url',
+                            'url': 'https://example.com',
+                        },
+                        'buttons': [{
+                            'type': 'postback',
+                            'title': 'Postback button',
+                            'payload': 'PAYLOAD',
+                        }],
+                    }],
+                    'buttons': [{
+                        'type': 'postback',
+                        'title': 'Postback button',
+                        'payload': 'PAYLOAD',
+                    }],
+                },
+            },
+            'quick_replies': [{'content_type': 'location'}]
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({'message_id': 'MESSAGE_ID'}),
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
+    def test_outbound_receipt_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content=None,
+            helper_metadata={'messenger': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'receipt',
+                        'recipient_name': 'John Doe',
+                        'order_number': '1234',
+                        'currency': 'ZAR',
+                        'payment_method': 'VISA',
+                        'order_url': 'https://example.com/order',
+                        'timestamp': '1428444852',
+                        'elements': [{
+                            'title': 'Item',
+                            'quantity': 2,
+                            'price': 40,
+                            'currency': 'ZAR',
+                            'image_url': 'https://example.com/image.jpg',
+                        }],
+                        'address': {
+                            'street_1': '44 Stanley',
+                            'street_2': '',
+                            'city': 'Johannesburg',
+                            'postal_code': '1234',
+                            'state': 'Gauteng',
+                            'country': 'RSA',
+                        },
+                        'summary': {
+                            'subtotal': 40,
+                            'shipping_cost': 20.40,
+                            'total_tax': 0.60,
+                            'total_cost': 61,
+                        },
+                        'adjustments': [{
+                            'name': 'Discount',
+                            'amount': 10,
+                        }],
+                    },
+                },
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'receipt',
+                    'recipient_name': 'John Doe',
+                    'order_number': '1234',
+                    'currency': 'ZAR',
+                    'payment_method': 'VISA',
+                    'order_url': 'https://example.com/order',
+                    'timestamp': '1428444852',
+                    'elements': [{
+                        'title': 'Item',
+                        'quantity': 2,
+                        'price': 40,
+                        'currency': 'ZAR',
+                        'image_url': 'https://example.com/image.jpg',
+                    }],
+                    'address': {
+                        'street_1': '44 Stanley',
+                        'street_2': '',
+                        'city': 'Johannesburg',
+                        'postal_code': '1234',
+                        'state': 'Gauteng',
+                        'country': 'RSA',
+                    },
+                    'summary': {
+                        'subtotal': 40,
+                        'shipping_cost': 20.40,
+                        'total_tax': 0.60,
+                        'total_cost': 61,
+                    },
+                    'adjustments': [{
+                        'name': 'Discount',
+                        'amount': 10,
+                    }],
+                },
+            }
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({'message_id': 'MESSAGE_ID'}),
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
+    def test_outbound_button_message(self):
+        transport = yield self.mk_transport(access_token='TOKEN')
+
+        d = self.tx_helper.make_dispatch_outbound(
+            to_addr='USER_ID',
+            content=None,
+            helper_metadata={'messenger': {
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'button',
+                        'text': 'Buttons!',
+                        'buttons': [
+                            {
+                                'type': 'postback',
+                                'title': 'Postback',
+                                'payload': 'PAYLOAD',
+                            },
+                            {
+                                'type': 'web_url',
+                                'title': 'Website',
+                                'url': 'https://example.com',
+                            },
+                        ],
+                    },
+                },
+            }})
+
+        request_d, args, kwargs = yield transport.request_queue.get()
+        method, url, data = args
+
+        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['access_token'], 'TOKEN')
+
+        req_body = parse_qs(json.loads(data['batch'])[0]['body'])
+        message = eval(req_body['message'][0])
+        recipient = eval(req_body['recipient'][0])
+
+        self.assertEqual(message, {
+            'attachment': {
+                'type': 'template',
+                'payload': {
+                    'template_type': 'button',
+                    'text': 'Buttons!',
+                    'buttons': [
+                        {
+                            'type': 'postback',
+                            'title': 'Postback',
+                            'payload': 'PAYLOAD',
+                        },
+                        {
+                            'type': 'web_url',
+                            'title': 'Website',
+                            'url': 'https://example.com',
+                        },
+                    ],
+                },
+            },
+        })
+        self.assertEqual(recipient, {'id': 'USER_ID'})
+
+        request_d.callback(DummyResponse(200, json.dumps([{
+            'code': 200,
+            'body': json.dumps({'message_id': 'MESSAGE_ID'}),
+        }])))
+
+        msg = yield d
+        yield self.assert_outbound_success(msg['message_id'], 'MESSAGE_ID')
+
+    @inlineCallbacks
     def test_handle_outbound_success(self):
         transport = yield self.mk_transport()
         yield transport.handle_outbound_success('1', '2')
@@ -925,533 +1352,3 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(status['component'], 'outbound')
         self.assertEqual(status['type'], status_type)
         self.assertEqual(status['message'], reason)
-
-    @inlineCallbacks
-    def test_construct_plain_reply(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world',
-            to_addr='123',
-            helper_metadata={'messenger': {'quick_replies': [
-                {
-                    'content_type': 'text',
-                    'title': 'RED',
-                    'payload': {'key': 'value'},
-                    'image_url': 'https://image.com',
-                }
-            ]}})
-
-        self.assertEqual(
-            transport.construct_reply(msg),
-            {
-                'message': {
-                    'text': 'hello world',
-                    'quick_replies': [
-                        {
-                            'content_type': 'text',
-                            'title': 'RED',
-                            'payload': json.dumps({'key': 'value'},
-                                                  separators=(',', ':')),
-                            'image_url': 'https://image.com',
-                        }
-                    ]
-                },
-                'recipient': {
-                    'id': '123'
-                }
-            })
-
-    @inlineCallbacks
-    def test_construct_button_reply(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world', to_addr='123', helper_metadata={
-                'messenger': {
-                    'template_type': 'button',
-                    'text': 'hello world',
-                    'quick_replies': [
-                        {
-                            'content_type': 'location',
-                        }
-                    ],
-                    'buttons': [{
-                        'title': 'Jupiter',
-                        'payload': {
-                            'content': '1',
-                        },
-                    }, {
-                        'type': 'web_url',
-                        'title': 'Mars',
-                        'url': 'http://test',
-                    }, {
-                        'type': 'phone_number',
-                        'title': 'Venus',
-                        'payload': '+271234567',
-                    }, {
-                        'type': 'element_share',
-                        'share_contents': {
-                            # Must be a generic template
-                            'attachment': {
-                                'type': 'template',
-                                'payload': {
-                                    'template_type': 'generic',
-                                    'elements': [
-                                        {'title': 'element_1'},
-                                        {'title': 'element_2'},
-                                    ]
-                                }
-                            }
-                        }
-                    }, {
-                        'type': 'account_linking',
-                        'url': 'https://account.com',
-                    }, {
-                        'type': 'account_unlinking',
-                    }]
-                }
-            })
-
-        self.assertEqual(
-            transport.construct_reply(msg),
-            {
-                'recipient': {
-                    'id': '123',
-                },
-                'message': {
-                    'quick_replies': [{'content_type': 'location'}],
-                    'attachment': {
-                        'type': 'template',
-                        'payload': {
-                            'template_type': 'button',
-                            'text': 'hello world',
-                            'sharable': True,
-                            'buttons': [
-                                {
-                                    'type': 'postback',
-                                    'title': 'Jupiter',
-                                    'payload': '{"content":"1"}',
-                                },
-                                {
-                                    'type': 'web_url',
-                                    'title': 'Mars',
-                                    'url': 'http://test',
-                                },
-                                {
-                                    'type': 'phone_number',
-                                    'title': 'Venus',
-                                    'payload': '+271234567',
-                                },
-                                {
-                                    'type': 'element_share',
-                                    'share_contents': {
-                                        # Must be a generic template
-                                        'attachment': {
-                                            'type': 'template',
-                                            'payload': {
-                                                'template_type': 'generic',
-                                                'elements': [
-                                                    {'title': 'element_1'},
-                                                    {'title': 'element_2'},
-                                                ]
-                                            }
-                                        }
-                                    }
-                                },
-                                {
-                                    'type': 'account_linking',
-                                    'url': 'https://account.com',
-                                },
-                                {
-                                    'type': 'account_unlinking',
-                                },
-                            ]
-                        }
-                    }
-                }
-            })
-
-    @inlineCallbacks
-    def test_construct_bad_button(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world', to_addr='123', helper_metadata={
-                'messenger': {
-                    'template_type': 'button',
-                    'text': 'hello world',
-                    'buttons': [{
-                        'title': 'Jupiter',
-                        'payload': {
-                            'content': '1',
-                        },
-                    }, {
-                        'type': 'unknown',
-                        'title': 'Mars',
-                    }]
-                }
-            })
-
-        with self.assertRaisesRegexp(
-                UnsupportedMessage,
-                'Unknown button type "unknown"'):
-            transport.construct_reply(msg)
-
-    @inlineCallbacks
-    def test_construct_generic_reply(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world', to_addr='123', helper_metadata={
-                'messenger': {
-                    'template_type': 'generic',
-                    'elements': [{
-                        'title': 'hello world',
-                        'subtitle': 'arf',
-                        'item_url': 'http://test',
-                        'buttons': [{
-                            'title': 'Jupiter',
-                            'payload': {
-                                'content': '1',
-                            },
-                        }, {
-                            'type': 'web_url',
-                            'title': 'Mars',
-                            'url': 'http://test',
-                        }, {
-                            'type': 'element_share',
-                        }]
-                    }, {
-                        'title': 'hello again',
-                        'image_url': 'http://image',
-                        'buttons': [{
-                            'title': 'Mercury',
-                            'payload': {
-                                'content': '1',
-                            },
-                        }, {
-                            'type': 'web_url',
-                            'title': 'Venus',
-                            'url': 'http://test',
-                        }]
-                    }
-                    ]
-                }
-            })
-
-        self.maxDiff = None
-
-        self.assertEqual(
-            transport.construct_reply(msg),
-            {
-                'recipient': {
-                    'id': '123',
-                },
-                'message': {
-                    'attachment': {
-                        'type': 'template',
-                        'payload': {
-                            'template_type': 'generic',
-                            'elements': [{
-                                'title': 'hello world',
-                                'subtitle': 'arf',
-                                'item_url': 'http://test',
-                                'buttons': [{
-                                    'type': 'postback',
-                                    'title': 'Jupiter',
-                                    'payload': '{"content":"1"}',
-                                }, {
-                                    'type': 'web_url',
-                                    'title': 'Mars',
-                                    'url': 'http://test',
-                                }, {
-                                    'type': 'element_share',
-                                }]
-                            }, {
-                                'title': 'hello again',
-                                'image_url': 'http://image',
-                                'buttons': [{
-                                    'type': 'postback',
-                                    'title': 'Mercury',
-                                    'payload': '{"content":"1"}',
-                                }, {
-                                    'type': 'web_url',
-                                    'title': 'Venus',
-                                    'url': 'http://test',
-                                }]
-                            }]
-                        }
-                    }
-                }
-            })
-
-    @inlineCallbacks
-    def test_construct_list_reply(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world', to_addr='123', helper_metadata={
-                'messenger': {
-                    'template_type': 'list',
-                    # 'top_element_style': 'compact',
-                    'elements': [{
-                        'title': 'hello world',
-                        'subtitle': 'arf',
-                        'default_action': {
-                            'url': 'http://test',
-                        },
-                        'buttons': [{
-                            'title': 'Jupiter',
-                            'payload': {
-                                'content': '1',
-                            },
-                        }, {
-                            'type': 'web_url',
-                            'title': 'Mars',
-                            'url': 'http://test',
-                        }]
-                    }, {
-                        'title': 'hello again',
-                        'image_url': 'http://image',
-                        'default_action': {
-                            'url': 'http://test',
-                            'webview_height_ratio': 'compact',
-                            'messenger_extensions': False,
-                            'fallback_url': 'http://moo'
-                        },
-                        'buttons': [{
-                            'title': 'Mercury',
-                            'payload': {
-                                'content': '2',
-                            },
-                        }, {
-                            'type': 'web_url',
-                            'title': 'Venus',
-                            'url': 'http://test',
-                            'webview_height_ratio': 'tall',
-                            'messenger_extensions': True,
-                            'fallback_url': 'http://moo'
-                        }]
-                    }
-                    ],
-                    'buttons': [{
-                        'title': 'Europa',
-                        'payload': {
-                            'content': '3',
-                        },
-                    }]
-                }
-            })
-
-        self.maxDiff = None
-
-        self.assertEqual(
-            transport.construct_reply(msg),
-            {
-                'recipient': {
-                    'id': '123',
-                },
-                'message': {
-                    'attachment': {
-                        'type': 'template',
-                        'payload': {
-                            'template_type': 'list',
-                            'top_element_style': 'compact',
-                            'elements': [{
-                                'title': 'hello world',
-                                'subtitle': 'arf',
-                                'default_action': {
-                                    'type': 'web_url',
-                                    'url': 'http://test',
-                                },
-                                'buttons': [{
-                                    'type': 'postback',
-                                    'title': 'Jupiter',
-                                    'payload': '{"content":"1"}',
-                                }, {
-                                    'type': 'web_url',
-                                    'title': 'Mars',
-                                    'url': 'http://test',
-                                }]
-                            }, {
-                                'title': 'hello again',
-                                'image_url': 'http://image',
-                                'default_action': {
-                                    'type': 'web_url',
-                                    'url': 'http://test',
-                                    'webview_height_ratio': 'compact',
-                                    'messenger_extensions': False,
-                                    'fallback_url': 'http://moo'
-                                },
-                                'buttons': [{
-                                    'type': 'postback',
-                                    'title': 'Mercury',
-                                    'payload': '{"content":"2"}',
-                                }, {
-                                    'type': 'web_url',
-                                    'title': 'Venus',
-                                    'url': 'http://test',
-                                    'webview_height_ratio': 'tall',
-                                    'messenger_extensions': True,
-                                    'fallback_url': 'http://moo'
-                                }]
-                            }],
-                            'buttons': [{
-                                'type': 'postback',
-                                'title': 'Europa',
-                                'payload': '{"content":"3"}',
-                            }]
-                        }
-                    }
-                }
-            })
-
-    @inlineCallbacks
-    def test_construct_receipt_reply(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            'hello world', to_addr='123', helper_metadata={
-                'messenger': {
-                    'template_type': 'receipt',
-                    'recipient_name': 'recipient',
-                    'merchant_name': 'merchant',
-                    'order_url': 'http://example.com',
-                    'order_number': '123',
-                    'currency': 'ZAR',
-                    'payment_method': 'VISA',
-                    'timestamp': 'now',
-                    'elements': [
-                        {
-                            'title': 'item 1',
-                            'subtitle': 'this is an element',
-                            'price': 20,
-                            'quantity': 2,
-                            'currency': 'ZAR',
-                            'image_url': 'http://example.com',
-                        },
-                        {
-                            'title': 'item 2',
-                            'price': 10,
-                        },
-                    ],
-                    'address': {
-                        'street_1': '44 Stanley Avenue',
-                        'street_2': '',
-                        'city': 'Johannesburg',
-                        'postal_code': '1234',
-                        'state': 'Gauteng',
-                        'country': 'RSA',
-                    },
-                    'summary': {
-                        'subtotal': 40.0,
-                        'shipping_cost': 10.0,
-                        'total_tax': 14.0,
-                        'total_cost': 64.0,
-                    },
-                    'adjustments': [
-                        {'name': 'discount', 'amount': 10},
-                        {'name': 'coupon', 'amount': 5},
-                    ],
-                },
-            })
-
-        self.assertEqual(transport.construct_reply(msg), {
-            'recipient': {
-                'id': '123',
-            },
-            'message': {
-                'attachment': {
-                    'type': 'template',
-                    'payload': {
-                        'template_type': 'receipt',
-                        'recipient_name': 'recipient',
-                        'merchant_name': 'merchant',
-                        'order_url': 'http://example.com',
-                        'order_number': '123',
-                        'currency': 'ZAR',
-                        'payment_method': 'VISA',
-                        'timestamp': 'now',
-                        'elements': [
-                            {
-                                'title': 'item 1',
-                                'subtitle': 'this is an element',
-                                'price': 20,
-                                'quantity': 2,
-                                'currency': 'ZAR',
-                                'image_url': 'http://example.com',
-                            },
-                            {
-                                'title': 'item 2',
-                                'price': 10,
-                            },
-                        ],
-                        'address': {
-                            'street_1': '44 Stanley Avenue',
-                            'street_2': '',
-                            'city': 'Johannesburg',
-                            'postal_code': '1234',
-                            'state': 'Gauteng',
-                            'country': 'RSA',
-                        },
-                        'summary': {
-                            'subtotal': 40.0,
-                            'shipping_cost': 10.0,
-                            'total_tax': 14.0,
-                            'total_cost': 64.0,
-                        },
-                        'adjustments': [
-                            {'name': 'discount', 'amount': 10},
-                            {'name': 'coupon', 'amount': 5},
-                        ],
-                    },
-                },
-            },
-        })
-
-    @inlineCallbacks
-    def test_construct_media_reply_good_types(self):
-        MEDIA_TYPES = {'image', 'video', 'audio', 'file'}
-        transport = yield self.mk_transport()
-
-        for media_type in MEDIA_TYPES:
-            msg = self.msg_helper.make_outbound(
-                content=None, to_addr='123', helper_metadata={
-                    'messenger': {
-                        'media': {
-                            'type': media_type,
-                            'url': 'http://example.com',
-                        },
-                    },
-                })
-
-            self.assertEqual(transport.construct_reply(msg), {
-                'recipient': {
-                    'id': '123',
-                },
-                'message': {
-                    'attachment': {
-                        'type': media_type,
-                        'payload': {
-                            'url': 'http://example.com',
-                        },
-                    },
-                },
-            })
-
-    @inlineCallbacks
-    def test_construct_media_reply_bad_types(self):
-        transport = yield self.mk_transport()
-        msg = self.msg_helper.make_outbound(
-            content='text', to_addr='123', helper_metadata={
-                'messenger': {
-                    'media': {
-                        'type': 'gif',
-                        'url': 'http://example.com',
-                    },
-                },
-            })
-
-        self.assertEqual(transport.construct_reply(msg), {
-            'recipient': {
-                'id': '123',
-            },
-            'message': {
-                'text': 'text',
-            },
-        })

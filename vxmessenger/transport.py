@@ -324,11 +324,12 @@ class MessengerTransport(HttpRpcTransport):
                 # Request was not completed, add to queue again
                 yield self.add_request(req)
             elif res.get('code') == http.OK:
-                if res['body'].get('message_id') is None:
+                body = json.loads(res['body'])
+                if body.get('message_id') is None:
                     # TODO: acknowledge success of non-message requests
                     continue
                 yield self.handle_outbound_success(
-                    req['message_id'], res['body']['message_id'])
+                    req['message_id'], body['message_id'])
             else:
                 body = json.loads(res['body'])
                 fail_type = self.SEND_FAIL_TYPES.get(
@@ -482,285 +483,72 @@ class MessengerTransport(HttpRpcTransport):
             self.log.error('Unable to retrieve user profile: %s' % (data,))
             returnValue({})
 
-    def construct_reply(self, message):
-        meta = message.get('helper_metadata', {}).get('messenger', {})
-
-        SENDER_ACTIONS = {'typing_on', 'typing_off', 'mark_seen'}
-        if meta.get('sender_action') in SENDER_ACTIONS:
-            return {
-                'recipient': {'id': message['to_addr']},
-                'sender_action': meta['sender_action']
-            }
-
-        template_type = meta.get('template_type')
-        reply = {}
-        media = meta.get('media', {})
-
-        # TODO: handle media messages properly
-        if template_type == 'button':
-            reply = self.construct_button_reply(message)
-        elif template_type == 'generic':
-            reply = self.construct_generic_reply(message)
-        elif template_type == 'list':
-            reply = self.construct_list_reply(message)
-        elif template_type == 'receipt':
-            reply = self.construct_receipt_reply(message)
-        elif media.get('type', '') in {'audio', 'video', 'image', 'file'}:
-            reply = self.construct_media_reply(message)
-        else:
-            reply = self.construct_plain_reply(message)
-
-        if meta.get('quick_replies') is not None:
-            reply['message']['quick_replies'] = [
-                self.construct_quick_button(btn)
-                for btn in meta['quick_replies']]
-        return reply
-
-    def construct_button(self, btn):
-        typ = btn.get('type', 'postback')
-        if typ == 'element_share':
-            share_btn = {'type': 'element_share'}
-            if 'share_contents' in btn:
-                share_btn['share_contents'] = btn['share_contents']
-            return share_btn
-        if typ == 'account_linking':
-            return {
-                'type': 'account_linking',
-                'url': btn['url'],
-            }
-        if typ == 'account_unlinking':
-            return {'type': 'account_unlinking'}
-        ret = {
-            'type': typ,
-            'title': btn['title'],
-        }
-        if typ == 'postback':
-            ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
-        elif typ == 'web_url':
-            ret['url'] = btn['url']
-            if 'webview_height_ratio' in btn:
-                ret['webview_height_ratio'] = btn['webview_height_ratio']
-            if 'messenger_extensions' in btn:
-                ret['messenger_extensions'] = btn['messenger_extensions']
-                if 'fallback_url' in btn:
-                    ret['fallback_url'] = btn['fallback_url']
-            if 'webview_share_button' in btn:
-                ret['webview_share_button'] = btn['webview_share_button']
-        elif typ == 'phone_number':
-            ret['payload'] = btn['payload']
-        else:
-            raise UnsupportedMessage('Unknown button type "%s"' % typ)
-        return ret
-
-    def construct_button_reply(self, message):
-        button = message['helper_metadata']['messenger']
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'attachment': {
-                    'type': 'template',
-                    'payload': {
-                        'template_type': 'button',
-                        'sharable': button.get('sharable', True),
-                        'text': button['text'],
-                        'buttons': [self.construct_button(btn)
-                                    for btn in button['buttons']]
-                    }
-                }
-            }
-        }
-
-    def construct_element(self, element):
-        ret = {
-            'title': element['title'],
-        }
-        if element.get('subtitle'):
-            ret['subtitle'] = element['subtitle']
-        if element.get('image_url'):
-            ret['image_url'] = element['image_url']
-        if element.get('item_url'):
-            ret['item_url'] = element['item_url']
-        if element.get('default_action'):
-            act = element['default_action']
-            if 'url' in act:
-                defa = {
-                    'type': 'web_url',
-                    'url': act['url'],
-                }
-                if 'webview_height_ratio' in act:
-                    defa['webview_height_ratio'] = act['webview_height_ratio']
-                    if 'messenger_extensions' in act:
-                        defa['messenger_extensions'] =\
-                            act['messenger_extensions']
-                    if 'fallback_url' in act:
-                        defa['fallback_url'] = act['fallback_url']
-                ret['default_action'] = defa
-        buttons = [self.construct_button(btn) for btn in element['buttons']]
-        if buttons:
-            ret['buttons'] = buttons
-        return ret
-
-    def construct_generic_reply(self, message):
-        template = message['helper_metadata']['messenger']
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'attachment': {
-                    'type': 'template',
-                    'payload': {
-                        'template_type': 'generic',
-                        'elements': [self.construct_element(element)
-                                     for element in template['elements']]
-                    }
-                }
-            }
-        }
-
-    def construct_list_reply(self, message):
-        template = message['helper_metadata']['messenger']
-        payload = {
-            'template_type': 'list',
-            'top_element_style': template.get('top_element_style', 'compact'),
-            'elements': [self.construct_element(element)
-                         for element in template['elements']]
-        }
-        if 'buttons' in template:
-            btns = [self.construct_button(btn) for btn in template['buttons']]
-            if btns:
-                payload['buttons'] = btns
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'attachment': {
-                    'type': 'template',
-                    'payload': payload
-                }
-            }
-        }
-
-    def construct_receipt_reply(self, message):
-        template = message['helper_metadata']['messenger']
-
-        def construct_receipt_element(element):
-            ret = {
-                'title': element['title'],
-                'price': element['price'],
-            }
-            if element.get('image_url'):
-                ret['image_url'] = element['image_url']
-            if element.get('subtitle'):
-                ret['subtitle'] = element['subtitle']
-            if element.get('quantity'):
-                ret['quantity'] = element['quantity']
-            if element.get('currency'):
-                ret['currency'] = element['currency']
-            return ret
-
-        payload = {
-            'template_type': 'receipt',
-            'order_number': template['order_number'],
-            'currency': template['currency'],
-            'payment_method': template['payment_method'],
-            'recipient_name': template['recipient_name'],
-            'summary': {
-                'total_cost': template['summary']['total_cost'],
-            },
-        }
-        if template.get('elements'):
-            payload['elements'] = [construct_receipt_element(element)
-                                   for element in template['elements']]
-        if template.get('address'):
-            payload['address'] = {
-                'street_1': template['address']['street_1'],
-                'street_2': template['address'].get('street_2', ''),
-                'city': template['address']['city'],
-                'state': template['address']['state'],
-                'country': template['address']['country'],
-                'postal_code': template['address']['postal_code'],
-            }
-
-        # Remaining non-required fields
-        for field in {'merchant_name', 'order_url', 'timestamp',
-                      'adjustments'}:
-            if template.get(field):
-                payload[field] = template[field]
-        for field in {'subtotal', 'total_tax', 'shipping_cost'}:
-            if template['summary'].get(field):
-                payload['summary'][field] = template['summary'][field]
-
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'attachment': {
-                    'type': 'template',
-                    'payload': payload,
-                },
-            },
-        }
-
-    def construct_media_reply(self, message):
-        media = message['helper_metadata']['messenger']['media']
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'attachment': {
-                    'type': media['type'],
-                    'payload': {
-                        'url': media['url'],
-                    },
-                },
-            },
-        }
-
-    def construct_quick_button(self, btn):
-        typ = btn.get('content_type', 'text')
-        ret = {
-            'content_type': typ
-        }
-        if typ == 'text':
-            ret['title'] = btn['title']
-            ret['payload'] = json.dumps(btn['payload'], separators=(',', ':'))
-            if btn.get('image_url'):
-                ret['image_url'] = btn['image_url']
-        elif typ == 'location':
-            pass
-        else:
-            raise UnsupportedMessage('Unknown quick reply type "%s"' % typ)
-        return ret
-
-    def construct_plain_reply(self, message):
-        return {
-            'recipient': {
-                'id': message['to_addr'],
-            },
-            'message': {
-                'text': message['content'],
-            }
-        }
-
     @inlineCallbacks
     def handle_outbound_message(self, message):
-        self.log.info("MessengerTransport outbound %r" % (message,))
-        reply = self.construct_reply(message)
-        self.log.info("Reply: %s" % (reply,))
+        self.log.info('MessengerTransport outbound %r' % (message,))
+        meta = message['helper_metadata'].get('messenger', {})
+
+        if message['content'] is not None and len(message['content']) > 0:
+            msg = self.construct_text_message(message)
+        elif 'sender_action' in meta:
+            msg = self.construct_sender_action(message)
+        elif 'attachment' in meta:
+            msg = self.construct_attachment_message(message)
+
+        if 'quick_replies' in meta:
+            msg['message']['quick_replies'] = meta['quick_replies']
+        if 'metadata' in meta:
+            msg['message']['metadata'] = meta['metadata']
+        if 'notification_type' in meta:
+            msg['notification_type'] = meta['notification_type']
+
+        self.log.info('Reply: %s' % (msg,))
 
         request = {
             'message_id': message['message_id'],
             'method': 'POST',
             'relative_url': self.MESSAGES_API_PATH,
-            'body': urlencode(reply),
+            'body': urlencode(self._unicode_to_utf8(msg)),
         }
+
         yield self.add_request(request)
+
+    # When using Facebook's batch API, the request dict needs to be
+    # URL encoded, which means it can't contain unicode keys or values
+    def _unicode_to_utf8(self, d):
+        if isinstance(d, dict):
+            return {self._unicode_to_utf8(key): self._unicode_to_utf8(value)
+                    for key, value in d.iteritems()}
+        elif isinstance(d, list):
+            return [self._unicode_to_utf8(element) for element in d]
+        elif isinstance(d, unicode):
+            return d.encode('utf-8')
+        else:
+            return d
+
+    def construct_sender_action(self, message):
+        meta = message['helper_metadata']['messenger']
+        return {
+            'recipient': {'id': message['to_addr']},
+            'sender_action': meta['sender_action']
+        }
+
+    def construct_attachment_message(self, message):
+        meta = message['helper_metadata']['messenger']
+        return {
+            'recipient': {'id': message['to_addr']},
+            'message': {
+                'attachment': meta['attachment']
+            }
+        }
+
+    def construct_text_message(self, message):
+        return {
+            'recipient': {'id': message['to_addr']},
+            'message': {
+                'text': message['content'],
+            }
+        }
 
     # These seem to be standard things which allow a Junebug transport
     # to generate status reports for a channel
