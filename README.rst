@@ -145,28 +145,34 @@ limits appy.
     self.publish_message(
         helper_metadata={
             'messenger': {
-                'template_type': 'button'
-                'text': 'The accompanying text with the button',
-                'buttons': [{ # Up to 3 buttons
-                    'type': 'postback', # defaults to postback if not specified
-                    'title': 'Button 1',
+                'attachment': {
+                    'type': 'template',
                     'payload': {
-                        # In here you can put whatever you want to
-                        # 'content' and 'in_reply_to' will go into the standard vumi message
-                        'content': 'The content expected when a button is pressed', # This can be left blank
-                        'in_reply_to': 'The ID of the previous message', # This can be left blank
-                        # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
-                        'anything_extra': 'Bonus!'
+                        'template_type': 'button'
+                        'text': 'The accompanying text with the button',
+                        'buttons': [{ # Up to 3 buttons
+                            'type': 'postback', # defaults to postback if not specified
+                            'title': 'Button 1',
+                            'payload': {
+                                # In here you can put whatever you want to
+                                # 'content' and 'in_reply_to' will go into the standard vumi message
+                                'content': 'The content expected when a button is pressed', # This can be left blank
+                                'in_reply_to': 'The ID of the previous message', # This can be left blank
+                                # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
+                                'anything_extra': 'Bonus!'
+                            }
+                            }, {
+                                'type': 'web_url',
+                                'title': 'Button 2',
+                                'url': 'http://some.url'
+                            }, {
+                                'type': 'phone_number',
+                                'title': 'Button 3',
+                                'url': '+271234567'
+                            }
+                        ]
                     }
-                }, {
-                    'type': 'web_url',
-                    'title': 'Button 2',
-                    'url': 'http://some.url'
-                }, {
-                    'type': 'phone_number',
-                    'title': 'Button 3',
-                    'url': '+271234567'
-                }]
+                }
             }
         })
 
@@ -182,43 +188,49 @@ limits appy.
     self.publish_message(
         helper_metadata={
             'messenger': {
-                'template_type': 'generic'
-                'elements': [{ # Up to 10 elements
-                    'title': 'The title',
-                    'subtitle': 'The subtitle', # This can be left blank
-                    'image_url': 'The image_url to use', # This can be left blank
-                    'item_url': 'The url if you click on the element', # Optional, Cannot be used with default_action
-                    'default_action': { # The action if you click on element, optional, Cannot be user with item_url
-                        'url': 'http://test',
-                        'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link
-                        'messenger_extensions': True,  # If you are using the js extensions api, optional
-                        'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
-                                                     # will use url if not found, optional
-                    },
-                    'buttons': [{ # Up to 3 buttons
-                        'type': 'postback', # defaults to postback if not specified
-                        'title': 'Button 1',
-                        'payload': {
-                            # In here you can put whatever you want to
-                            # 'content' and 'in_reply_to' will go into the standard vumi message
-                            'content': 'The content expected when a button is pressed', # This can be left blank
-                            'in_reply_to': 'The ID of the previous message', # This can be left blank
-                            # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
-                            'anything_extra': 'Bonus!'
-                        }
-                    }, {
-                        'type': 'web_url',
-                        'title': 'Button 2',
-                        'url': 'http://some.url'
-                    }, {
-                        'type': 'phone_number',
-                        'title': 'Button 3',
-                        'url': '+271234567'
-                    }, {
-                        # Share this post with friends. Only available in Generic Reply
-                        'type': 'element_share'
-                    }]
-                }]
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'generic'
+                        'elements': [{ # Up to 10 elements
+                            'title': 'The title',
+                            'subtitle': 'The subtitle', # This can be left blank
+                            'image_url': 'The image_url to use', # This can be left blank
+                            'item_url': 'The url if you click on the element', # Optional, Cannot be used with default_action
+                            'default_action': { # The action if you click on element, optional, Cannot be user with item_url
+                                'url': 'http://test',
+                                'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link
+                                'messenger_extensions': True,  # If you are using the js extensions api, optional
+                                'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
+                                                         # will use url if not found, optional
+                            },
+                            'buttons': [{ # Up to 3 buttons
+                                'type': 'postback', # defaults to postback if not specified
+                                'title': 'Button 1',
+                                'payload': {
+                                    # In here you can put whatever you want to
+                                    # 'content' and 'in_reply_to' will go into the standard vumi message
+                                    'content': 'The content expected when a button is pressed', # This can be left blank
+                                    'in_reply_to': 'The ID of the previous message', # This can be left blank
+                                    # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
+                                    'anything_extra': 'Bonus!'
+                                }
+                                }, {
+                                    'type': 'web_url',
+                                    'title': 'Button 2',
+                                    'url': 'http://some.url'
+                                }, {
+                                    'type': 'phone_number',
+                                    'title': 'Button 3',
+                                    'url': '+271234567'
+                                }, {
+                                    # Share this post with friends. Only available in Generic Reply
+                                    'type': 'element_share'
+                                }
+                            ]
+                        }]
+                    }
+                }
             }
         })
 
@@ -234,44 +246,49 @@ limits appy.
     self.publish_message(
         helper_metadata={
             'messenger': {
-                'template_type': 'list'
-                'top_element_style': 'compact|large', # Defines top element style
-                                                      # Defaults to compact if not specified
-                'elements': [{ # 2 - 4 elements
-                    'title': 'The title',
-                    'subtitle': 'The subtitle', # This can be left blank
-                    'image_url': 'The image_url to use', # This can be left blank
-                    'default_action': { # The action if you click on element, optional
-                        'url': 'http://test',
-                        'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link, optional
-                        'messenger_extensions': True,  # If you are using the js extensions api, optional
-                        'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
-                                                     # will use url if not found, optional
-                    },
-                    'buttons': [{ # Up to 1 button
-                        'type': 'postback', # defaults to postback if not specified
-                        'title': 'Button 1',
-                        'payload': {
-                            # In here you can put whatever you want to
-                            # 'content' and 'in_reply_to' will go into the standard vumi message
-                            'content': 'The content expected when a button is pressed', # This can be left blank
-                            'in_reply_to': 'The ID of the previous message', # This can be left blank
-                            # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
-                            'anything_extra': 'Bonus!'
-                        }
-                    }, {
-                        'type': 'web_url',
-                        'title': 'Button 2',
-                        'url': 'http://some.url'
-                    }, {
-                        'type': 'phone_number',
-                        'title': 'Button 3',
-                        'url': '+271234567'
-                    }]
-                }],
-                'buttons': [{ # Up to 1 button at bottom of list
-                    ...
-                 }
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'list'
+                        'top_element_style': 'compact|large', # Defines top element style
+                                                              # Defaults to compact if not specified
+                        'elements': [{ # 2 - 4 elements
+                            'title': 'The title',
+                            'subtitle': 'The subtitle', # This can be left blank
+                            'image_url': 'The image_url to use', # This can be left blank
+                            'default_action': { # The action if you click on element, optional
+                                'url': 'http://test',
+                                'webview_height_ratio': 'compact|tall|full',  # Leave out for regular link, optional
+                                'messenger_extensions': True,  # If you are using the js extensions api, optional
+                                'fallback_url': 'http://moo' # Fallback URL if target doesn't support js extensions
+                                                         # will use url if not found, optional
+                            },
+                            'buttons': [{ # Up to 1 button
+                                'type': 'postback', # defaults to postback if not specified
+                                'title': 'Button 1',
+                                'payload': {
+                                    # In here you can put whatever you want to
+                                    # 'content' and 'in_reply_to' will go into the standard vumi message
+                                    'content': 'The content expected when a button is pressed', # This can be left blank
+                                    'in_reply_to': 'The ID of the previous message', # This can be left blank
+                                    # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
+                                    'anything_extra': 'Bonus!'
+                                }
+                            }, {
+                                'type': 'web_url',
+                                'title': 'Button 2',
+                                'url': 'http://some.url'
+                            }, {
+                                'type': 'phone_number',
+                                'title': 'Button 3',
+                                'url': '+271234567'
+                            }]
+                        }],
+                            'buttons': [{ # Up to 1 button at bottom of list
+                            ...
+                        }]
+                    }
+                }
             }
         })
 
@@ -285,69 +302,71 @@ Please be aware of the limitations_ that Facebook applies to these messages.
     self.publish_message(
         helper_metadata={
             'messenger': {
-                'template_type': 'receipt',
-                'order_number': '123', # Must be unique
-                'currency' 'ZAR'
-                'payment_method': 'EFT',
-                'recipient_name': 'John Doe',
-                'summary': {
-                    'total_cost': 100.0,
-                    # Optional fields
-                    'subtotal': 40.0,
-                    'total_tax': 10.0,
-                    'shipping_cost': 10.00,
-                },
-                # Optional fields
-                'merchant_name': 'XYZ Inc.'
-                'order_url': 'http://example.com',
-                'timestamp': '12345678',
-                'elements': [
-                    # Up to 100 elements
-                    {
-                        'title': 'element title',
-                        'price': 10
+                'attachment': {
+                    'type': 'template',
+                    'payload': {
+                        'template_type': 'receipt',
+                        'order_number': '123', # Must be unique
+                        'currency' 'ZAR'
+                        'payment_method': 'EFT',
+                        'recipient_name': 'John Doe',
+                        'summary': {
+                            'total_cost': 100.0,
+                            # Optional fields
+                            'subtotal': 40.0,
+                            'total_tax': 10.0,
+                            'shipping_cost': 10.00,
+                        },
                         # Optional fields
-                        'subtitle': 'element subtitle',
-                        'quantity': 1,
-                        'currency': 'ZAR',
-                        'image_url': 'http://example.com',
-                    },
-                ],
-                'adjustments': [
-                    {
-                        'name': 'discount',
-                        'amount': 1,
-                    },
-                ],
-                'address': {
-                    'street_1': '1 Main Street',
-                    'street_2': 'Suburb' # This field is optional
-                    'city': 'Cape Town',
-                    'state': 'WC',
-                    'country': 'RSA',
-                    'postal_code': '1234',
-                },
-            },
+                        'merchant_name': 'XYZ Inc.'
+                        'order_url': 'http://example.com',
+                        'timestamp': '12345678',
+                        'elements': [
+                            # Up to 100 elements
+                            {
+                                'title': 'element title',
+                                'price': 10
+                                # Optional fields
+                                'subtitle': 'element subtitle',
+                                'quantity': 1,
+                                'currency': 'ZAR',
+                                'image_url': 'http://example.com',
+                            },
+                        ],
+                        'adjustments': [
+                            {
+                                'name': 'discount',
+                                'amount': 1,
+                            },
+                        ],
+                    '   address': {
+                            'street_1': '1 Main Street',
+                            'street_2': 'Suburb' # This field is optional
+                            'city': 'Cape Town',
+                            'state': 'WC',
+                            'country': 'RSA',
+                            'postal_code': '1234',
+                        },
+                    }
+                }
+            }
         })
 
-A Quick Reply
+Quick replies
 ~~~~~~~~~~~~~
-
-Please be aware of the limitations_ that Facebook applies to these messages.
-A call to action may only have a maximum of 10 buttons and character count
-limits appy.
 
 A Quick Reply is similar to a button reply, but Messenger shows the buttons
 temporarily and they disappear after being pressed. You can also have up to
 10 buttons. Only ``postback`` buttons is allowed in this mode.
+
+Quick replies can be appended to any message format.
 
 .. code-block:: python
 
     self.publish_message(
         helper_metadata={
             'messenger': {
-                'template_type': 'quick'
-                'text': 'The accompanying text with the button',
+                ...
                 'quick_replies': [{ # Up to 10 quick replies
                     'type': 'text', # defaults to text if not specified
                     'title': 'Button 1',
