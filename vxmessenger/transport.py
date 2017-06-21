@@ -252,6 +252,8 @@ class MessengerTransport(HttpRpcTransport):
         self._request_loop = LoopingCall(self.dispatch_requests)
         self._start_request_loop(self._request_loop)
 
+        self.REQ_QUEUE_KEY = 'batchqueue:%s' % self.transport_name
+
     @inlineCallbacks
     def teardown_transport(self):
         if hasattr(self, 'web_resource'):
@@ -273,7 +275,7 @@ class MessengerTransport(HttpRpcTransport):
     @inlineCallbacks
     def add_request(self, request):
         req_string = json.dumps(request)
-        self.queue_len = yield self.redis.rpush('request_queue', req_string)
+        self.queue_len = yield self.redis.rpush(self.REQ_QUEUE_KEY, req_string)
 
     @inlineCallbacks
     def dispatch_requests(self):
@@ -296,7 +298,8 @@ class MessengerTransport(HttpRpcTransport):
             'batch': [],
         }
         for i in range(0, batch_size):
-            req_string = yield self.redis.lpop('request_queue')
+            req_string = yield self.redis.lpop(self.REQ_QUEUE_KEY)
+            self.queue_len -= 1
             if req_string is None:
                 continue
             request = json.loads(req_string)

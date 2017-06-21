@@ -192,7 +192,7 @@ class TestMessengerTransport(VumiTestCase):
         yield transport.handle_batch_response(response)
         self.assertEqual(transport.pending_requests, [])
 
-        request = yield transport.redis.lpop('request_queue')
+        request = yield transport.redis.lpop(transport.REQ_QUEUE_KEY)
         self.assertEqual(request, json.dumps({'message_id': '3'}))
 
     @inlineCallbacks
