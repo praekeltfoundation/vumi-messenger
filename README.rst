@@ -18,6 +18,12 @@ Vumi Messenger Transport
 All of Vumi's applications can be surfaced on Messenger with the Messenger Transport.
 It provides a great experience for interactive mobile conversations at scale.
 
+Note on compatibility
+=====================
+
+Please note that breaking changes to the transport interface were introduced in version 2.0.0.
+If your setup uses the old interface, you should use a previous version (1.2.6 or earlier), as the changes are not backwards compatible.
+
 
 Getting Started
 ===============
