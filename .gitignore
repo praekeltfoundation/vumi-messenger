@@ -46,3 +46,6 @@ docs/_build
 /_trial_temp/
 *.sqlite3
 utils/
+
+logs/
+junebug.log

@@ -1,0 +1,21 @@
+{
+    "type": "facebook",
+    "amqp_queue": "messenger_transport",
+    "public_http": {
+        "enabled": true,
+        "web_path": "/api",
+        "web_port": 8051
+    },
+    "config": {
+        "web_path": "/api",
+        "web_port": 8051,
+        "noisy": true,
+        "page_id": "YOUR_FB_PAGE_ID",
+        "retrieve_profile": false,
+        "outbound_url": "https://graph.facebook.com/v2.8/me/messages",
+        "access_token": "YOUR_FB_ACCESS_TOKEN",
+        "redis_manager": {},
+        "request_batch_size": 50,
+        "request_batch_wait_time": 0.1
+    }
+}
