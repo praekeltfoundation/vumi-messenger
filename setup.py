@@ -14,9 +14,6 @@ with open('README.rst') as readme_file:
 with open('requirements.txt') as req_file:
     requirements = req_file.read().split('\n')
 
-with open('requirements-dev.txt') as req_file:
-    requirements_dev = req_file.read().split('\n')
-
 with open('VERSION') as fp:
     version = fp.read().strip()
 

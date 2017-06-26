@@ -1,0 +1,15 @@
+-r requirements.in
+
+# Optional packages
+Django<1.10
+raven
+dj-database-url
+
+# Dev/testing packages
+flake8
+coverage
+Sphinx
+pytest
+pytest-xdist
+pytest-cov
+pytest-django

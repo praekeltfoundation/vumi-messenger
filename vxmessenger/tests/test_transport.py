@@ -1,5 +1,5 @@
 import json
-from urllib import urlencode
+from urlparse import parse_qs
 
 import treq
 from twisted.internet import reactor
@@ -618,18 +618,24 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
+        data['batch'] = json.loads(data['batch'])
+        data['batch'][0]['body'] = {
+            k: eval(v[0])
+            for k, v
+            in parse_qs(data['batch'][0]['body']).items()
+        }
         self.assertFalse(data['include_headers'])
         self.assertEqual(data['access_token'], 'access_token')
-        self.assertEqual(data['batch'], json.dumps([
+        self.assertEqual(data['batch'], [
             {
                 'method': 'POST',
                 'relative_url': 'v2.8/me/messages',
-                'body': urlencode({
-                    'message': {'text': u'hi'},
-                    'recipient': {'id': u'+123'},
-                }),
+                'body': {
+                    'message': {'text': 'hi'},
+                    'recipient': {'id': '+123'},
+                },
             },
-        ]))
+        ])
         request_d.callback(DummyResponse(200, json.dumps([
             {
                 'code': 200,
