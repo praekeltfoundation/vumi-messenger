@@ -10,7 +10,7 @@ from twisted.web import http
 from twisted.web.client import HTTPConnectionPool
 
 from vumi.tests.helpers import VumiTestCase, MessageHelper
-from vumi.tests.utils import LogCatcher, MockHttpServer
+from vumi.tests.utils import MockHttpServer
 from vumi.transports.httprpc.tests.helpers import HttpRpcTransportHelper
 
 from vxmessenger.transport import MessengerTransport
