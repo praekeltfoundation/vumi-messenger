@@ -12,7 +12,7 @@ up:
 	@pip-compile -o requirements_dev.txt etc/requirements_dev.in
 
 deps:
-	@pip-sync requirements_dev.txt
+	@pip install -q -r requirements_dev.txt
 
 check: deps
 	flake8 vxmessenger

@@ -274,7 +274,7 @@ class MessengerTransport(HttpRpcTransport):
 
     @inlineCallbacks
     def add_request(self, request):
-        req_string = json.dumps(request)
+        req_string = json.dumps(request, separators=(',', ':'))
         self.queue_len = yield self.redis.rpush(self.REQ_QUEUE_KEY, req_string)
 
     @inlineCallbacks
@@ -294,7 +294,7 @@ class MessengerTransport(HttpRpcTransport):
 
         data = {
             'access_token': self.config['access_token'],
-            'include_headers': False,
+            'include_headers': 'false',
             'batch': [],
         }
         for i in range(0, batch_size):
@@ -310,7 +310,7 @@ class MessengerTransport(HttpRpcTransport):
                 'body': request.get('body', ''),
             })
 
-        data['batch'] = json.dumps(data['batch'])
+        data['batch'] = json.dumps(data['batch'], separators=(',', ':'))
         response = yield self.request('POST', self.BATCH_API_URL, data,
                                       pool=self.pool)
         if response.code == http.OK:
@@ -335,6 +335,7 @@ class MessengerTransport(HttpRpcTransport):
                     req['message_id'], body['message_id'])
             else:
                 body = json.loads(res['body'])
+                self.log.error('Message rejected: %s' % (body,))
                 fail_type = self.SEND_FAIL_TYPES.get(
                     body['error']['code'], 'request_fail_unknown')
                 yield self.handle_outbound_failure(
@@ -497,6 +498,9 @@ class MessengerTransport(HttpRpcTransport):
             msg = self.construct_sender_action(message)
         elif 'attachment' in meta:
             msg = self.construct_attachment_message(message)
+        else:
+            self.log.error('Unhandled message: %s' % (message,))
+            returnValue({})
 
         if 'quick_replies' in meta:
             msg['message']['quick_replies'] = meta['quick_replies']
@@ -511,23 +515,13 @@ class MessengerTransport(HttpRpcTransport):
             'message_id': message['message_id'],
             'method': 'POST',
             'relative_url': self.MESSAGES_API_PATH,
-            'body': urlencode(self._unicode_to_utf8(msg)),
+            'body': urlencode({
+                k: json.dumps(v) if isinstance(v, (list, dict)) else v
+                for k, v in msg.items()
+            }),
         }
 
         yield self.add_request(request)
-
-    # When using Facebook's batch API, the request dict needs to be
-    # URL encoded, which means it can't contain unicode keys or values
-    def _unicode_to_utf8(self, d):
-        if isinstance(d, dict):
-            return {self._unicode_to_utf8(key): self._unicode_to_utf8(value)
-                    for key, value in d.iteritems()}
-        elif isinstance(d, list):
-            return [self._unicode_to_utf8(element) for element in d]
-        elif isinstance(d, unicode):
-            return d.encode('utf-8')
-        else:
-            return d
 
     def construct_sender_action(self, message):
         meta = message['helper_metadata']['messenger']

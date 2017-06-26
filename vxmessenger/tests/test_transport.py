@@ -137,7 +137,7 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(method, 'POST')
         self.assertEqual(url, 'https://graph.facebook.com')
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'access-token')
         self.assertEqual(json.loads(data['batch']), batch)
 
@@ -170,7 +170,7 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(transport.pending_requests, [])
 
         request = yield transport.redis.lpop(transport.REQ_QUEUE_KEY)
-        self.assertEqual(request, json.dumps({'message_id': '3'}))
+        self.assertEqual(request, '{"message_id":"3"}')
 
     @inlineCallbacks
     def test_hub_challenge(self):
@@ -780,12 +780,12 @@ class TestMessengerTransport(VumiTestCase):
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'access_token')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
         sender_action = req_body['sender_action'][0]
-        recipient = eval(req_body['recipient'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(sender_action, 'typing_on')
         self.assertEqual(recipient, {'id': '+123'})
@@ -810,12 +810,12 @@ class TestMessengerTransport(VumiTestCase):
 
         (request_d, args, kwargs) = yield transport.request_queue.get()
         method, url, data = args
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'access_token')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {'text': 'hi'})
         self.assertEqual(recipient, {'id': '+123'})
@@ -884,12 +884,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'text': 'Hello, world!',
@@ -930,12 +930,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'], False)
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'attachment': {
@@ -992,12 +992,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'attachment': {
@@ -1072,12 +1072,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'attachment': {
@@ -1167,12 +1167,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'attachment': {
@@ -1255,12 +1255,12 @@ class TestMessengerTransport(VumiTestCase):
         request_d, args, kwargs = yield transport.request_queue.get()
         method, url, data = args
 
-        self.assertFalse(data['include_headers'])
+        self.assertEqual(data['include_headers'], 'false')
         self.assertEqual(data['access_token'], 'TOKEN')
 
         req_body = parse_qs(json.loads(data['batch'])[0]['body'])
-        message = eval(req_body['message'][0])
-        recipient = eval(req_body['recipient'][0])
+        message = json.loads(req_body['message'][0])
+        recipient = json.loads(req_body['recipient'][0])
 
         self.assertEqual(message, {
             'attachment': {

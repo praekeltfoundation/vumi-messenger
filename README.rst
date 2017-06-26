@@ -46,25 +46,28 @@ save it as a file called ``config.json``:
 .. code-block:: json
 
     {
-      "type": "facebook",
-      "amqp_queue": "messenger_transport",
-      "public_http": {
-        "enabled": true,
-        "web_path": "/api",
-        "web_port": 8051
-      },
-      "config": {
-        "web_path": "/api",
-        "web_port": 8051,
-        "noisy": true,
-        "page_id": "YOUR_FB_PAGE_ID",
-        "retrieve_profile": false,
-        "outbound_url": "https://graph.facebook.com/v2.8/me/messages",
-        "access_token": "YOUR_FB_ACCESS_TOKEN",
-        "redis_manager": {},
-        "request_batch_size": 50,
-        "request_batch_wait_time": 0.1
-      }
+        "type": "facebook",
+        "label": "Sample Facebook Channel",
+        "mo_url": "http://127.0.0.1:8000/channel/message",
+        "status_url": "http://127.0.0.1:8000/channel/status",
+        "public_http": {
+            "enabled": true,
+            "web_path": "/api",
+            "web_port": 8051
+        },
+        "config": {
+            "web_path": "/api",
+            "web_port": 8051,
+            "noisy": true,
+            "page_id": "YOUR_FB_PAGE_ID",
+            "retrieve_profile": false,
+            "outbound_url": "https://graph.facebook.com/v2.8/me/messages",
+            "access_token": "YOUR_FB_PAGE_ID",
+            "redis_manager": {
+        },
+            "request_batch_size": 50,
+            "request_batch_wait_time": 0.1
+        }
     }
 
 The Messenger transport makes use of Facebook's Batch API, passing instructions
@@ -159,24 +162,23 @@ limits appy.
                         'buttons': [{ # Up to 3 buttons
                             'type': 'postback', # defaults to postback if not specified
                             'title': 'Button 1',
-                            'payload': {
+                            'payload': json.dumps({
                                 # In here you can put whatever you want to
                                 # 'content' and 'in_reply_to' will go into the standard vumi message
                                 'content': 'The content expected when a button is pressed', # This can be left blank
                                 'in_reply_to': 'The ID of the previous message', # This can be left blank
                                 # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                                 'anything_extra': 'Bonus!'
-                            }
-                            }, {
-                                'type': 'web_url',
-                                'title': 'Button 2',
-                                'url': 'http://some.url'
-                            }, {
-                                'type': 'phone_number',
-                                'title': 'Button 3',
-                                'url': '+271234567'
-                            }
-                        ]
+                            })
+                        }, {
+                            'type': 'web_url',
+                            'title': 'Button 2',
+                            'url': 'http://some.url'
+                        }, {
+                            'type': 'phone_number',
+                            'title': 'Button 3',
+                            'url': '+271234567'
+                        }]
                     }
                 }
             }
@@ -213,27 +215,26 @@ limits appy.
                             'buttons': [{ # Up to 3 buttons
                                 'type': 'postback', # defaults to postback if not specified
                                 'title': 'Button 1',
-                                'payload': {
+                                'payload': json.dumps({
                                     # In here you can put whatever you want to
                                     # 'content' and 'in_reply_to' will go into the standard vumi message
                                     'content': 'The content expected when a button is pressed', # This can be left blank
                                     'in_reply_to': 'The ID of the previous message', # This can be left blank
                                     # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                                     'anything_extra': 'Bonus!'
-                                }
-                                }, {
-                                    'type': 'web_url',
-                                    'title': 'Button 2',
-                                    'url': 'http://some.url'
-                                }, {
-                                    'type': 'phone_number',
-                                    'title': 'Button 3',
-                                    'url': '+271234567'
-                                }, {
-                                    # Share this post with friends. Only available in Generic Reply
-                                    'type': 'element_share'
-                                }
-                            ]
+                                })
+                            }, {
+                                'type': 'web_url',
+                                'title': 'Button 2',
+                                'url': 'http://some.url'
+                            }, {
+                                'type': 'phone_number',
+                                'title': 'Button 3',
+                                'url': '+271234567'
+                            }, {
+                                # Share this post with friends. Only available in Generic Reply
+                                'type': 'element_share'
+                            }]
                         }]
                     }
                 }
@@ -272,14 +273,14 @@ limits appy.
                             'buttons': [{ # Up to 1 button
                                 'type': 'postback', # defaults to postback if not specified
                                 'title': 'Button 1',
-                                'payload': {
+                                'payload': json.dumps({
                                     # In here you can put whatever you want to
                                     # 'content' and 'in_reply_to' will go into the standard vumi message
                                     'content': 'The content expected when a button is pressed', # This can be left blank
                                     'in_reply_to': 'The ID of the previous message', # This can be left blank
                                     # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                                     'anything_extra': 'Bonus!'
-                                }
+                                })
                             }, {
                                 'type': 'web_url',
                                 'title': 'Button 2',
@@ -345,7 +346,7 @@ Please be aware of the limitations_ that Facebook applies to these messages.
                                 'amount': 1,
                             },
                         ],
-                    '   address': {
+                        'address': {
                             'street_1': '1 Main Street',
                             'street_2': 'Suburb' # This field is optional
                             'city': 'Cape Town',
@@ -377,14 +378,14 @@ Quick replies can be appended to any message format.
                     'type': 'text', # defaults to text if not specified
                     'title': 'Button 1',
                     'image_url': 'The image_url to use', # This can be left blank
-                    'payload': {
+                    'payload': json.dumps({
                         # In here you can put whatever you want to
                         # 'content' and 'in_reply_to' will go into the standard vumi message
                         'content': 'The content expected when a button is pressed', # This can be left blank
                         'in_reply_to': 'The ID of the previous message', # This can be left blank
                         # Anything else will end up in transport_metadata.messenger and helper_metadata.messenger
                         'anything_extra': 'Bonus!'
-                    }
+                    })
                 }, {
                     'type': 'location',
                 }]
