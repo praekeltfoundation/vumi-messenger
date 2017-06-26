@@ -86,29 +86,6 @@ class TestMessengerTransport(VumiTestCase):
         self.assertEqual(transport.queue_len, 1)
 
     @inlineCallbacks
-    def test_request_loop_errback(self):
-        transport = yield self.mk_transport()
-        transport._request_loop.stop()
-
-        def _raise_error():
-            raise Exception('This is an error!')
-
-        transport._request_loop.f = _raise_error
-        with LogCatcher(message='request_loop') as lc:
-            transport._start_request_loop(transport._request_loop)
-            self.assertFalse(transport._request_loop.running)
-            logs = set(lc.messages())
-
-        transport._request_loop.f = transport.dispatch_requests
-        transport._start_request_loop(transport._request_loop)
-
-        self.assertTrue(transport._request_loop.running)
-        self.assertEqual(logs, {
-            'Error in request_loop: This is an error!',
-            'Restarting request_loop...',
-        })
-
-    @inlineCallbacks
     def test_batch_error_no_json(self):
         transport = yield self.mk_transport()
         transport.pending_requests = [{'message_id': '1'}]
