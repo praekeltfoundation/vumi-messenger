@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from urllib import urlencode
-from urlparse import urlsplit, urlunsplit
+from urlparse import parse_qs, urlsplit, urlunsplit
 
 import treq
 from confmodel.fallbacks import SingleFieldFallback
@@ -297,18 +297,28 @@ class MessengerTransport(HttpRpcTransport):
             'include_headers': 'false',
             'batch': [],
         }
+        recps = set()
+        wait_queue = []
         for i in range(0, batch_size):
             req_string = yield self.redis.lpop(self.REQ_QUEUE_KEY)
-            self.queue_len -= 1
-            if req_string is None:
-                continue
-            request = json.loads(req_string)
-            self.pending_requests.append(request)
-            data['batch'].append({
-                'method': request['method'],
-                'relative_url': request['relative_url'],
-                'body': request.get('body', ''),
-            })
+            recp = parse_qs(json.loads(req_string)['body'])['recipient'][0]
+            if recp not in recps:
+                recps.add(recp)
+                self.queue_len -= 1
+                if req_string is None:
+                    continue
+                request = json.loads(req_string)
+                self.pending_requests.append(request)
+                data['batch'].append({
+                    'method': request['method'],
+                    'relative_url': request['relative_url'],
+                    'body': request.get('body', ''),
+                })
+            else:
+                wait_queue.append(req_string)
+
+        for req_string in reversed(wait_queue):
+            yield self.redis.lpush(self.REQ_QUEUE_KEY, req_string)
 
         data['batch'] = json.dumps(data['batch'], separators=(',', ':'))
         response = yield self.request('POST', self.BATCH_API_URL, data,

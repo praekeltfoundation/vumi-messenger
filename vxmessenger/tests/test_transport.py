@@ -114,13 +114,13 @@ class TestMessengerTransport(VumiTestCase):
                 'message_id': '123',
                 'method': 'POST',
                 'relative_url': 'foo',
-                'body': {'param': 'value'},
+                'body': 'recipient=%7B%22id%22%3A%221168578783215492%22%7D'
             },
             {
                 'message_id': '456',
                 'method': 'GET',
                 'relative_url': 'bar',
-                'body': '',
+                'body': 'recipient=%7B%22id%22%3A%221168588783215492%22%7D'
             },
         ]
         batch = []
