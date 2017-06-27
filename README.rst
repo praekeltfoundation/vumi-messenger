@@ -65,7 +65,7 @@ save it as a file called ``config.json``:
             "access_token": "YOUR_FB_PAGE_ID",
             "redis_manager": {
         },
-            "request_batch_size": 50,
+            "request_batch_size": 20,
             "request_batch_wait_time": 0.1
         }
     }

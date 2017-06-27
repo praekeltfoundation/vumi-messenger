@@ -37,7 +37,7 @@ class MessengerTransportConfig(HttpRpcTransport.CONFIG_CLASS):
         "the helper_metadata", required=False, default=False)
     request_batch_size = ConfigInt(
         "The maximum number of requests to send using using batch API calls",
-        required=False, default=50, static=True)
+        required=False, default=20, static=True)
     request_batch_wait_time = ConfigFloat(
         "The time to wait between batch API calls (in seconds)",
         required=False, default=0.1, static=True)
