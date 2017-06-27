@@ -68,7 +68,7 @@ class Page(object):
             self.content,
             self.mid,
             self.timestamp,
-            json.dumps(self.extra)
+            json.dumps(self.extra, separators=(',', ':'))
         )
 
     @classmethod
@@ -335,7 +335,7 @@ class MessengerTransport(HttpRpcTransport):
                     req['message_id'], body['message_id'])
             else:
                 body = json.loads(res['body'])
-                self.log.error('Message rejected: %s' % (body,))
+                self.log.error('Message rejected: %s' % (json.dumps(body),))
                 fail_type = self.SEND_FAIL_TYPES.get(
                     body['error']['code'], 'request_fail_unknown')
                 yield self.handle_outbound_failure(
@@ -516,7 +516,8 @@ class MessengerTransport(HttpRpcTransport):
             'method': 'POST',
             'relative_url': self.MESSAGES_API_PATH,
             'body': urlencode({
-                k: json.dumps(v) if isinstance(v, (list, dict)) else v
+                k: json.dumps(v, separators=(',', ':'))
+                if isinstance(v, (list, dict)) else v
                 for k, v in msg.items()
             }),
         }
