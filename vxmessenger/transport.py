@@ -502,12 +502,15 @@ class MessengerTransport(HttpRpcTransport):
         self.log.info('MessengerTransport outbound %r' % (message,))
         meta = message['helper_metadata'].get('messenger', {})
 
-        if message['content'] is not None and len(message['content']) > 0:
+        if 'attachment' in meta:
+            msg = self.construct_attachment_message(message)
+        elif 'text' in meta:
+            message['content'] = meta['text']
+            msg = self.construct_text_message(message)
+        elif message['content']:
             msg = self.construct_text_message(message)
         elif 'sender_action' in meta:
             msg = self.construct_sender_action(message)
-        elif 'attachment' in meta:
-            msg = self.construct_attachment_message(message)
         else:
             self.log.error('Unhandled message: %s' % (message,))
             returnValue({})

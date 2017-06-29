@@ -27,10 +27,10 @@ class WebhookService(object):
               help='Which port to listen on.', type=int)
 @click.option('--token',
               help='The token to verify', type=str)
-def cli(interface, port, token):
+def cli(interface, port, token):  # pragma: nocover
     store = WebhookService(token)
     store.app.run(interface, port)
 
 
-if __name__ == '__main__':
+if __name__ == '__main__':  # pragma: nocover
     cli()
